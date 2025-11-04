@@ -1,51 +1,48 @@
 import express from 'express';
 import cors from 'cors';
-import { Client, LocalAuth } from 'whatsapp-web.js';
+import { Client, NoAuth } from 'whatsapp-web.js'; // Alterado de LocalAuth para NoAuth
 import qrcode from 'qrcode-terminal';
 
 const app = express();
 
-// ====================================================================
-// CONFIGURAÇÃO DO CORS
-// Isso permite que seu site (frontend) faça requisições para este servidor (backend).
-// ====================================================================
 const corsOptions = {
   origin: [
     'https://www.jataifood.com.br', 
     'https://jataifood.vercel.app',
-    'http://localhost:5173' // Adicionado para facilitar testes locais no futuro
+    'http://localhost:5173'
   ]
 };
-
-// Aplica o middleware do CORS em todas as rotas
 app.use(cors(corsOptions ));
-// ====================================================================
 
-// Objeto para armazenar as instâncias do cliente do WhatsApp por ID
 const clients = {};
 
-// Rota para iniciar uma nova sessão do WhatsApp
 app.get('/api/whatsapp/start/:id', (req, res) => {
     const { id } = req.params;
 
-    if (clients[id] && clients[id].info) {
+    if (clients[id]) {
+        console.log(`Sessão para ${id} já existe.`);
         return res.json({ status: 'already-started', message: 'Sessão já iniciada.' });
     }
 
     console.log(`Iniciando sessão para o ID: ${id}`);
 
+    // ====================================================================
+    // ALTERAÇÃO PRINCIPAL: Removida a estratégia de autenticação local
+    // ====================================================================
     const client = new Client({
-        authStrategy: new LocalAuth({ clientId: id }),
+        authStrategy: new NoAuth(), // Usando NoAuth para manter a sessão apenas em memória
         puppeteer: {
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            headless: true, // Garante que o navegador rode sem interface gráfica
         },
     });
+    // ====================================================================
 
     clients[id] = client;
 
     client.on('qr', (qr) => {
-        console.log(`QR Code para ${id}:`, qr);
-        // Não enviamos o QR aqui, o frontend vai pegar pela rota de status
+        console.log(`QR Code gerado para ${id}`);
+        // A rota de status vai lidar com o envio do QR
     });
 
     client.on('ready', () => {
@@ -54,24 +51,30 @@ app.get('/api/whatsapp/start/:id', (req, res) => {
 
     client.on('auth_failure', msg => {
         console.error(`Falha na autenticação para ${id}:`, msg);
-        delete clients[id];
+        if (clients[id]) {
+            clients[id].destroy();
+            delete clients[id];
+        }
     });
 
     client.on('disconnected', (reason) => {
         console.log(`Cliente ${id} foi desconectado:`, reason);
-        client.destroy();
-        delete clients[id];
+        if (clients[id]) {
+            clients[id].destroy();
+            delete clients[id];
+        }
     });
 
     client.initialize().catch(err => {
         console.error(`Erro ao inicializar cliente ${id}:`, err);
-        delete clients[id];
+        if (clients[id]) {
+            delete clients[id];
+        }
     });
 
     res.json({ status: 'starting', message: 'Iniciando sessão do WhatsApp. Aguarde o QR Code.' });
 });
 
-// Rota para verificar o status da conexão e obter o QR code
 app.get('/api/whatsapp/status/:id', (req, res) => {
     const { id } = req.params;
     const client = clients[id];
@@ -80,47 +83,37 @@ app.get('/api/whatsapp/status/:id', (req, res) => {
         return res.json({ status: 'disconnected', qr: null });
     }
 
-    // Usamos um pequeno truque para pegar o QR code que já foi gerado
-    client.once('qr', (qr) => {
-        res.json({ status: 'qr', qr: qr });
-    });
+    // Função para enviar o QR code
+    const sendQr = (qr) => {
+        if (!res.headersSent) {
+            res.json({ status: 'qr', qr: qr });
+        }
+    };
 
-    // Se já estiver conectado, informa o status
+    // Se o QR já foi gerado, ele será pego aqui.
+    client.once('qr', sendQr);
+
     client.getState().then(state => {
         if (state === 'CONNECTED') {
-            res.json({ status: 'connected', qr: null });
-        }
-        // Se não estiver conectado e o evento 'qr' não disparar em 5s,
-        // respondemos que está desconectado para o frontend não ficar esperando para sempre.
-        setTimeout(() => {
+            client.removeListener('qr', sendQr); // Remove o listener se já estiver conectado
             if (!res.headersSent) {
-                res.json({ status: 'disconnected', qr: null });
+                res.json({ status: 'connected', qr: null });
             }
-        }, 5000);
+        }
     }).catch(() => {
+        client.removeListener('qr', sendQr);
         if (!res.headersSent) {
             res.json({ status: 'disconnected', qr: null });
         }
     });
-});
 
-// Rota para fazer logout
-app.get('/api/whatsapp/logout/:id', (req, res) => {
-    const { id } = req.params;
-    const client = clients[id];
-
-    if (client) {
-        client.logout().then(() => {
-            console.log(`Logout realizado para o cliente ${id}`);
-            delete clients[id];
-            res.json({ status: 'success', message: 'Logout realizado com sucesso.' });
-        }).catch(err => {
-            console.error(`Erro ao fazer logout para ${id}:`, err);
-            res.status(500).json({ status: 'error', message: 'Erro ao fazer logout.' });
-        });
-    } else {
-        res.status(404).json({ status: 'error', message: 'Sessão não encontrada.' });
-    }
+    // Timeout para garantir uma resposta
+    setTimeout(() => {
+        client.removeListener('qr', sendQr);
+        if (!res.headersSent) {
+            res.json({ status: 'waiting', qr: null });
+        }
+    }, 10000);
 });
 
 
@@ -128,3 +121,6 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+
+// Exporta o app para o Vercel
+export default app;
