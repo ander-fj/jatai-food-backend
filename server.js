@@ -15,17 +15,17 @@ const corsOptions = {
 app.use(cors(corsOptions ));
 
 const clients = {};
-const qrStore = {}; // Objeto para armazenar o QR code temporariamente
+const qrStore = {}; 
 
-// Rota para iniciar a sessão (POST) - CORRETO
 app.post('/api/whatsapp/start/:id', (req, res) => {
     const { id } = req.params;
 
     if (clients[id]) {
-        return res.json({ status: 'already-started', message: 'Sessão já iniciada.' });
+        return res.json({ status: 'already-started' });
     }
 
     console.log(`Iniciando sessão para o ID: ${id}`);
+    qrStore[id] = null; // Limpa QR antigo ao iniciar
 
     const client = new Client({
         puppeteer: {
@@ -38,18 +38,12 @@ app.post('/api/whatsapp/start/:id', (req, res) => {
 
     client.on('qr', (qr) => {
         console.log(`QR Code gerado para ${id}`);
-        qrStore[id] = qr; // Armazena o QR code
+        qrStore[id] = qr; 
     });
 
     client.on('ready', () => {
         console.log(`Cliente ${id} está pronto!`);
-        delete qrStore[id]; // Limpa o QR code depois de conectar
-    });
-
-    client.on('auth_failure', msg => {
-        console.error(`Falha na autenticação para ${id}:`, msg);
-        if (clients[id]) { clients[id].destroy(); delete clients[id]; }
-        delete qrStore[id];
+        delete qrStore[id]; 
     });
 
     client.on('disconnected', (reason) => {
@@ -60,56 +54,45 @@ app.post('/api/whatsapp/start/:id', (req, res) => {
 
     client.initialize().catch(err => {
         console.error(`Erro ao inicializar cliente ${id}:`, err);
-        if (clients[id]) { delete clients[id]; }
-        delete qrStore[id];
     });
 
-    res.json({ status: 'starting', message: 'Iniciando sessão do WhatsApp. Aguarde o QR Code.' });
+    res.json({ status: 'starting' });
 });
 
 // ====================================================================
-// NOVA ROTA: /api/whatsapp/qr/:id
-// O frontend vai chamar esta rota para buscar o QR code.
+// ROTA /qr/ SIMPLIFICADA E CORRIGIDA
 // ====================================================================
 app.get('/api/whatsapp/qr/:id', (req, res) => {
     const { id } = req.params;
     const qr = qrStore[id];
 
     if (qr) {
+        // Se temos um QR code, enviamos.
+        console.log(`Enviando QR code para o frontend (ID: ${id})`);
         res.json({ status: 'qr', qr: qr });
     } else {
-        // Se não houver QR, pode ser que já conectou ou ainda não foi gerado
-        const client = clients[id];
-        if (client) {
-            client.getState().then(state => {
-                if (state === 'CONNECTED') {
-                    res.json({ status: 'connected', qr: null });
-                } else {
-                    res.status(404).json({ status: 'waiting', message: 'Aguardando geração do QR code.' });
-                }
-            }).catch(() => res.status(500).json({ status: 'error', message: 'Erro ao obter estado do cliente.' }));
-        } else {
-            res.status(404).json({ status: 'disconnected', message: 'Sessão não encontrada.' });
-        }
+        // Se não temos, simplesmente dizemos que não foi encontrado ainda.
+        // O frontend continuará tentando.
+        res.status(404).json({ status: 'waiting' });
     }
 });
 // ====================================================================
 
-
-// Rota de status (GET) - CORRETO
 app.get('/api/whatsapp/status/:id', (req, res) => {
     const { id } = req.params;
     const client = clients[id];
-
-    if (!client) {
-        return res.json({ status: 'disconnected' });
+    
+    // Esta rota agora só verifica se o cliente existe (conectado ou não)
+    if (client && client.info) {
+        return res.json({ status: 'connected' });
+    }
+    
+    // Se o QR existe, significa que está pendente
+    if (qrStore[id]) {
+        return res.json({ status: 'pending_qr' });
     }
 
-    client.getState().then(state => {
-        res.json({ status: state === 'CONNECTED' ? 'connected' : 'pending' });
-    }).catch(() => {
-        res.json({ status: 'disconnected' });
-    });
+    return res.json({ status: 'disconnected' });
 });
 
 const PORT = process.env.PORT || 10000;
