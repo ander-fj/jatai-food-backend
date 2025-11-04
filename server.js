@@ -16,9 +16,11 @@ app.use(cors(corsOptions ));
 
 const clients = {};
 
-// ... (TODO O SEU CÓDIGO DAS ROTAS /api/whatsapp/... FICA AQUI, SEM NENHUMA MUDANÇA) ...
-// Rota para iniciar uma nova sessão do WhatsApp
-app.get('/api/whatsapp/start/:id', (req, res) => {
+// ====================================================================
+// CORREÇÃO FINAL: Mudando de app.get para app.post
+// ====================================================================
+app.post('/api/whatsapp/start/:id', (req, res) => {
+// ====================================================================
     const { id } = req.params;
 
     if (clients[id]) {
@@ -71,7 +73,7 @@ app.get('/api/whatsapp/start/:id', (req, res) => {
     res.json({ status: 'starting', message: 'Iniciando sessão do WhatsApp. Aguarde o QR Code.' });
 });
 
-// Rota para verificar o status da conexão e obter o QR code
+// A rota de status é GET, o que está correto.
 app.get('/api/whatsapp/status/:id', (req, res) => {
     const { id } = req.params;
     const client = clients[id];
@@ -110,12 +112,7 @@ app.get('/api/whatsapp/status/:id', (req, res) => {
     }, 10000);
 });
 
-
-// ====================================================================
-// CORREÇÃO: Adicionando o app.listen de volta!
-// A Render precisa disso para saber em qual porta o servidor deve rodar.
-// ====================================================================
-const PORT = process.env.PORT || 10000; // A Render usa a porta 10000
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
