@@ -15,16 +15,13 @@ const corsOptions = {
 app.use(cors(corsOptions ));
 
 const clients = {};
+const qrStore = {}; // Objeto para armazenar o QR code temporariamente
 
-// ====================================================================
-// CORREÇÃO FINAL: Mudando de app.get para app.post
-// ====================================================================
+// Rota para iniciar a sessão (POST) - CORRETO
 app.post('/api/whatsapp/start/:id', (req, res) => {
-// ====================================================================
     const { id } = req.params;
 
     if (clients[id]) {
-        console.log(`Sessão para ${id} já existe.`);
         return res.json({ status: 'already-started', message: 'Sessão já iniciada.' });
     }
 
@@ -41,75 +38,78 @@ app.post('/api/whatsapp/start/:id', (req, res) => {
 
     client.on('qr', (qr) => {
         console.log(`QR Code gerado para ${id}`);
+        qrStore[id] = qr; // Armazena o QR code
     });
 
     client.on('ready', () => {
         console.log(`Cliente ${id} está pronto!`);
+        delete qrStore[id]; // Limpa o QR code depois de conectar
     });
 
     client.on('auth_failure', msg => {
         console.error(`Falha na autenticação para ${id}:`, msg);
-        if (clients[id]) {
-            clients[id].destroy();
-            delete clients[id];
-        }
+        if (clients[id]) { clients[id].destroy(); delete clients[id]; }
+        delete qrStore[id];
     });
 
     client.on('disconnected', (reason) => {
         console.log(`Cliente ${id} foi desconectado:`, reason);
-        if (clients[id]) {
-            clients[id].destroy();
-            delete clients[id];
-        }
+        if (clients[id]) { clients[id].destroy(); delete clients[id]; }
+        delete qrStore[id];
     });
 
     client.initialize().catch(err => {
         console.error(`Erro ao inicializar cliente ${id}:`, err);
-        if (clients[id]) {
-            delete clients[id];
-        }
+        if (clients[id]) { delete clients[id]; }
+        delete qrStore[id];
     });
 
     res.json({ status: 'starting', message: 'Iniciando sessão do WhatsApp. Aguarde o QR Code.' });
 });
 
-// A rota de status é GET, o que está correto.
+// ====================================================================
+// NOVA ROTA: /api/whatsapp/qr/:id
+// O frontend vai chamar esta rota para buscar o QR code.
+// ====================================================================
+app.get('/api/whatsapp/qr/:id', (req, res) => {
+    const { id } = req.params;
+    const qr = qrStore[id];
+
+    if (qr) {
+        res.json({ status: 'qr', qr: qr });
+    } else {
+        // Se não houver QR, pode ser que já conectou ou ainda não foi gerado
+        const client = clients[id];
+        if (client) {
+            client.getState().then(state => {
+                if (state === 'CONNECTED') {
+                    res.json({ status: 'connected', qr: null });
+                } else {
+                    res.status(404).json({ status: 'waiting', message: 'Aguardando geração do QR code.' });
+                }
+            }).catch(() => res.status(500).json({ status: 'error', message: 'Erro ao obter estado do cliente.' }));
+        } else {
+            res.status(404).json({ status: 'disconnected', message: 'Sessão não encontrada.' });
+        }
+    }
+});
+// ====================================================================
+
+
+// Rota de status (GET) - CORRETO
 app.get('/api/whatsapp/status/:id', (req, res) => {
     const { id } = req.params;
     const client = clients[id];
 
     if (!client) {
-        return res.json({ status: 'disconnected', qr: null });
+        return res.json({ status: 'disconnected' });
     }
 
-    const sendQr = (qr) => {
-        if (!res.headersSent) {
-            res.json({ status: 'qr', qr: qr });
-        }
-    };
-
-    client.once('qr', sendQr);
-
     client.getState().then(state => {
-        if (state === 'CONNECTED') {
-            client.removeListener('qr', sendQr);
-            if (!res.headersSent) {
-                res.json({ status: 'connected', qr: null });
-            }
-        }
+        res.json({ status: state === 'CONNECTED' ? 'connected' : 'pending' });
     }).catch(() => {
-        client.removeListener('qr', sendQr);
-        if (!res.headersSent) {
-            res.json({ status: 'disconnected', qr: null });
-        }
+        res.json({ status: 'disconnected' });
     });
-
-    setTimeout(() => {
-        client.removeListener('qr', sendQr);
-        if (!res.headersSent) {
-            res.json({ status: 'waiting', qr: null });
-        }
-    }, 10000);
 });
 
 const PORT = process.env.PORT || 10000;
