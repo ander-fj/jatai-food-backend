@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { Client } from 'whatsapp-web.js'; // Removido NoAuth da importação
+import { Client } from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 
 const app = express();
@@ -16,6 +16,8 @@ app.use(cors(corsOptions ));
 
 const clients = {};
 
+// ... (TODO O SEU CÓDIGO DAS ROTAS /api/whatsapp/... FICA AQUI, SEM NENHUMA MUDANÇA) ...
+// Rota para iniciar uma nova sessão do WhatsApp
 app.get('/api/whatsapp/start/:id', (req, res) => {
     const { id } = req.params;
 
@@ -26,17 +28,12 @@ app.get('/api/whatsapp/start/:id', (req, res) => {
 
     console.log(`Iniciando sessão para o ID: ${id}`);
 
-    // ====================================================================
-    // CORREÇÃO: A linha authStrategy foi completamente removida.
-    // A biblioteca usará a autenticação em memória por padrão.
-    // ====================================================================
     const client = new Client({
         puppeteer: {
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
             headless: true,
         },
     });
-    // ====================================================================
 
     clients[id] = client;
 
@@ -74,6 +71,7 @@ app.get('/api/whatsapp/start/:id', (req, res) => {
     res.json({ status: 'starting', message: 'Iniciando sessão do WhatsApp. Aguarde o QR Code.' });
 });
 
+// Rota para verificar o status da conexão e obter o QR code
 app.get('/api/whatsapp/status/:id', (req, res) => {
     const { id } = req.params;
     const client = clients[id];
@@ -113,9 +111,11 @@ app.get('/api/whatsapp/status/:id', (req, res) => {
 });
 
 
-const PORT = process.env.PORT || 3001;
+// ====================================================================
+// CORREÇÃO: Adicionando o app.listen de volta!
+// A Render precisa disso para saber em qual porta o servidor deve rodar.
+// ====================================================================
+const PORT = process.env.PORT || 10000; // A Render usa a porta 10000
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
-
-export default app;
