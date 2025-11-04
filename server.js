@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { Client, NoAuth } from 'whatsapp-web.js'; // Alterado de LocalAuth para NoAuth
+import { Client } from 'whatsapp-web.js'; // Removido NoAuth da importação
 import qrcode from 'qrcode-terminal';
 
 const app = express();
@@ -27,13 +27,13 @@ app.get('/api/whatsapp/start/:id', (req, res) => {
     console.log(`Iniciando sessão para o ID: ${id}`);
 
     // ====================================================================
-    // ALTERAÇÃO PRINCIPAL: Removida a estratégia de autenticação local
+    // CORREÇÃO: A linha authStrategy foi completamente removida.
+    // A biblioteca usará a autenticação em memória por padrão.
     // ====================================================================
     const client = new Client({
-        authStrategy: new NoAuth(), // Usando NoAuth para manter a sessão apenas em memória
         puppeteer: {
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
-            headless: true, // Garante que o navegador rode sem interface gráfica
+            headless: true,
         },
     });
     // ====================================================================
@@ -42,7 +42,6 @@ app.get('/api/whatsapp/start/:id', (req, res) => {
 
     client.on('qr', (qr) => {
         console.log(`QR Code gerado para ${id}`);
-        // A rota de status vai lidar com o envio do QR
     });
 
     client.on('ready', () => {
@@ -83,19 +82,17 @@ app.get('/api/whatsapp/status/:id', (req, res) => {
         return res.json({ status: 'disconnected', qr: null });
     }
 
-    // Função para enviar o QR code
     const sendQr = (qr) => {
         if (!res.headersSent) {
             res.json({ status: 'qr', qr: qr });
         }
     };
 
-    // Se o QR já foi gerado, ele será pego aqui.
     client.once('qr', sendQr);
 
     client.getState().then(state => {
         if (state === 'CONNECTED') {
-            client.removeListener('qr', sendQr); // Remove o listener se já estiver conectado
+            client.removeListener('qr', sendQr);
             if (!res.headersSent) {
                 res.json({ status: 'connected', qr: null });
             }
@@ -107,7 +104,6 @@ app.get('/api/whatsapp/status/:id', (req, res) => {
         }
     });
 
-    // Timeout para garantir uma resposta
     setTimeout(() => {
         client.removeListener('qr', sendQr);
         if (!res.headersSent) {
@@ -122,5 +118,4 @@ app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
 
-// Exporta o app para o Vercel
 export default app;
