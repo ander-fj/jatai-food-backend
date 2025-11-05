@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { Client } from 'whatsapp-web.js';
-import qrcode from 'qrcode-terminal';
+import qrcodeTerminal from 'qrcode-terminal';
+import QRCode from 'qrcode';
 
 const app = express();
 
@@ -90,13 +91,20 @@ app.post('/api/whatsapp/start/:id', (req, res) => {
 // =======================================================
 // ROTA PARA OBTER QR CODE
 // =======================================================
-app.get('/api/whatsapp/qr/:id', (req, res) => {
+app.get('/api/whatsapp/qr/:id', async (req, res) => {
   const { id } = req.params;
   const qr = qrStore[id];
 
   if (qr) {
-    console.log(`📲 Enviando QR Code para o frontend (ID: ${id})`);
-    return res.json({ status: 'qr', qr: qr });
+    try {
+      // Converter QR code de texto para data URL (imagem)
+      const qrDataUrl = await QRCode.toDataURL(qr);
+      console.log(`📲 Enviando QR Code como imagem para o frontend (ID: ${id})`);
+      return res.json({ status: 'qr', qr: qrDataUrl });
+    } catch (error) {
+      console.error(`❌ (${id}) Erro ao gerar QR code:`, error);
+      return res.status(500).json({ error: 'Erro ao gerar QR code' });
+    }
   } else {
     return res.status(404).json({ status: 'aguardando' });
   }
