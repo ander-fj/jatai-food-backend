@@ -40,6 +40,16 @@ app.get('/', (req, res) => {
     res.send('<h1>Servidor Jatai Food Backend está rodando.</h1><p>O cliente do WhatsApp está inicializando...</p>');
 });
 
+app.get('/api/whatsapp/status/:clientId', async (req, res) => {
+    try {
+        const state = await client.getState();
+        res.status(200).json({ status: state });
+    } catch (error) {
+        console.error('Error getting client state:', error);
+        res.status(500).json({ status: 'error', message: 'Could not get client state.' });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
 });
