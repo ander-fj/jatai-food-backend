@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Backend para o sistema Jatai Food",
   "main": "server.js",
-  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
