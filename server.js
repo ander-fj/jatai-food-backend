@@ -5,9 +5,18 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configura o CORS para permitir a origem específica do frontend
+// Configura o CORS para permitir origens específicas do frontend
+const allowedOrigins = ['https://www.jataifood.com.br', 'https://jataifood-alpha.vercel.app'];
 app.use(cors({
-  origin: ['https://www.jataifood.com.br', 'https://jataifood-alpha.vercel.app']
+  origin: function (origin, callback) {
+    // Permite requisições sem 'origin' (como de apps mobile ou Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'A política de CORS para este site não permite acesso da origem especificada.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
 }));
 app.use(express.json());
 
