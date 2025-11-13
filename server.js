@@ -7,7 +7,7 @@ const port = process.env.PORT || 3000;
 
 // Configura o CORS para permitir a origem específica do frontend
 app.use(cors({
-  origin: 'https://jataifood-alpha.vercel.app'
+  origin: ['https://www.jataifood.com.br', 'https://jataifood-alpha.vercel.app']
 }));
 app.use(express.json());
 
