@@ -87,40 +87,15 @@ app.post('/api/whatsapp/start/:clientId', (req, res) => {
 });
 
 // Endpoint para buscar o QR code
-app.get('/api/whatsapp/qr/:clientId', async (req, res) => {
+app.get('/api/whatsapp/qr/:clientId', (req, res) => {
     const clientId = req.params.clientId;
     const clientData = clients[clientId];
 
-    if (!clientData) {
-        return res.status(404).json({ message: 'Cliente não encontrado.' });
+    if (clientData && clientData.qr) {
+        res.status(200).json({ qr: clientData.qr });
+    } else {
+        res.status(404).json({ message: 'QR code não disponível.' });
     }
-
-    if (clientData.status === 'READY') {
-        return res.status(200).json({ message: 'Cliente já conectado.' });
-    }
-    
-    if (clientData.status !== 'INITIALIZING' && clientData.status !== 'QR_RECEIVED') {
-        return res.status(404).json({ message: `Status do cliente inválido para obter QR: ${clientData.status}` });
-    }
-
-    // Espera até 30 segundos pelo QR code
-    const startTime = Date.now();
-    while (Date.now() - startTime < 30000) {
-        if (clientData.qr) {
-            return res.status(200).json({ qr: clientData.qr });
-        }
-        // Se o cliente ficar pronto enquanto esperamos
-        if (clientData.status === 'READY') {
-            return res.status(200).json({ message: 'Cliente conectado enquanto aguardava QR.' });
-        }
-        // Se a conexão falhar enquanto esperamos
-        if (clientData.status === 'FAILED' || clientData.status === 'DISCONNECTED') {
-            return res.status(404).json({ message: `Conexão falhou enquanto aguardava QR. Status: ${clientData.status}` });
-        }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-
-    res.status(404).json({ message: 'Tempo de espera para o QR code esgotado.' });
 });
 
 // Endpoint para verificar o status do cliente
