@@ -5,19 +5,26 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configura o CORS para permitir origens específicas do frontend
-const allowedOrigins = ['https://www.jataifood.com.br', 'https://jataifood-alpha.vercel.app'];
-app.use(cors({
-  origin: function (origin, callback) {
-    // Permite requisições sem 'origin' (como de apps mobile ou Postman)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'A política de CORS para este site não permite acesso da origem especificada.';
-      return callback(new Error(msg), false);
+const allowedOrigins = [
+    'https://www.jataifood.com.br',
+    'https://jataifood-alpha.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'https://jatai-food.vercel.app'
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
     }
-    return callback(null, true);
-  }
-}));
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Estrutura para armazenar clientes e seus status
