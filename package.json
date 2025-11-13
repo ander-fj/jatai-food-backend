@@ -4,11 +4,13 @@
   "description": "Backend para o sistema Jatai Food",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server2.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "pino": "^9.2.0",
+    "pino-pretty": "^11.2.1",
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.23.0"
   }
