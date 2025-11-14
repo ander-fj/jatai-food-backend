@@ -1,8 +1,10 @@
 const express = require('express');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const cors = require('cors');
+const axios = require('axios');
 const path = require('path');
 const app = express();
+require('dotenv').config();
 const port = process.env.PORT || 3000;
 
 const allowedOrigins = [
@@ -41,7 +43,12 @@ function createClient(id) {
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage' // Adicionado para melhorar a estabilidade em ambientes com pouca memória
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process', // Desabilitado no Windows, mas útil no Linux
+                '--disable-gpu'
             ]
         }
     });
@@ -144,6 +151,35 @@ app.get('/api/whatsapp/status/:clientId', async (req, res) => {
         });
     } else {
         res.status(404).json({ status: 'NOT_INITIALIZED' });
+    }
+});
+
+// Endpoint para enviar mensagens usando o WhatsApp Cloud API
+app.post('/api/whatsapp/cloud/send', async (req, res) => {
+    const { to, message } = req.body;
+    const WABA_ID = process.env.WABA_ID; // ID da sua Conta do WhatsApp Business
+    const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID; // ID do número de telefone de origem
+    const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN; // O seu token de acesso
+
+    if (!to || !message || !WABA_ID || !PHONE_NUMBER_ID || !ACCESS_TOKEN) {
+        return res.status(400).json({ message: 'Faltam parâmetros obrigatórios (to, message) ou variáveis de ambiente (WABA_ID, PHONE_NUMBER_ID, WHATSAPP_ACCESS_TOKEN).' });
+    }
+
+    try {
+        const response = await axios.post(`https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`, {
+            messaging_product: 'whatsapp',
+            to: to,
+            type: 'text',
+            text: { body: message }
+        }, {
+            headers: {
+                'Authorization': `Bearer ${ACCESS_TOKEN}`
+            }
+        });
+        res.status(200).json({ message: 'Mensagem enviada com sucesso!', data: response.data });
+    } catch (error) {
+        console.error('Erro ao enviar mensagem via Cloud API:', error.response ? error.response.data : error.message);
+        res.status(500).json({ message: 'Falha ao enviar mensagem.', error: error.response ? error.response.data : error.message });
     }
 });
 
