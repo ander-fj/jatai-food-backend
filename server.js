@@ -58,6 +58,32 @@ app.post('/api/whatsapp/cloud/send', async (req, res) => {
     }
 });
 
+// Endpoint para gerar um QR Code para iniciar uma conversa com mensagem pré-preenchida
+app.post('/api/whatsapp/cloud/generate-qr', async (req, res) => {
+    const { prefilled_message } = req.body;
+    const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+    const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+
+    if (!prefilled_message || !PHONE_NUMBER_ID || !ACCESS_TOKEN) {
+        return res.status(400).json({ message: 'Faltam parâmetros obrigatórios (prefilled_message) ou variáveis de ambiente (PHONE_NUMBER_ID, WHATSAPP_ACCESS_TOKEN).' });
+    }
+
+    try {
+        const response = await axios.post(`https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/qr_codes`, {
+            prefilled_message: prefilled_message,
+            generate_qr_image: 'true' // Solicita a geração da imagem do QR code
+        }, {
+            headers: {
+                'Authorization': `Bearer ${ACCESS_TOKEN}`
+            }
+        });
+        res.status(200).json({ message: 'QR Code gerado com sucesso!', data: response.data });
+    } catch (error) {
+        console.error('Erro ao gerar QR Code via Cloud API:', error.response ? error.response.data : error.message);
+        res.status(500).json({ message: 'Falha ao gerar QR Code.', error: error.response ? error.response.data : error.message });
+    }
+});
+
 // Endpoint de Webhook para a API do WhatsApp Cloud
 // Usado para verificação e para receber mensagens
 app.all('/api/whatsapp/webhook', (req, res) => {
@@ -75,7 +101,7 @@ app.all('/api/whatsapp/webhook', (req, res) => {
         // Extrai a mensagem do corpo da requisição
         const message = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
 
-        if (message) {
+        if (message && message.type === 'text') {
             const from = message.from; // Número de quem enviou a mensagem
             const msg_body = message.text.body; // Conteúdo da mensagem
 
