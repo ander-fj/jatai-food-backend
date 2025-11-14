@@ -11,7 +11,8 @@ const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:5173',
-    'https://jatai-food.vercel.app'
+    'https://jatai-food.vercel.app',
+    'https://jatai-food-backend.onrender.com'
 ];
 
 const corsOptions = {
@@ -37,7 +38,11 @@ function createClient(id) {
         authStrategy: new LocalAuth({ clientId: id }),
         puppeteer: {
             headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage' // Adicionado para melhorar a estabilidade em ambientes com pouca memória
+            ]
         }
     });
 
