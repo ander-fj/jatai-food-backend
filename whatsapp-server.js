@@ -68,6 +68,11 @@ app.get('/', (req, res) => {
   res.send('Olá! Este é o servidor para o bot do WhatsApp.');
 });
 
+// Rota de Health Check para o Render
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Rota para verificar o status da conexão
 app.get('/api/whatsapp/status/:id', async (req, res) => {
   const { id } = req.params;
@@ -218,7 +223,7 @@ app.post('/api/whatsapp/start/:id', async (req, res) => {
           `;
 
           const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-          const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash-exp";
+          const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash";
           const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
           chatSessions[chatId] = model.startChat({
             history: [],
