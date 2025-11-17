@@ -104,11 +104,11 @@ app.get('/api/whatsapp/qr/:id', async (req, res) => {
   }
 });
 
-// Rota para iniciar a conexão do WhatsApp
-app.post('/api/whatsapp/start/:id', async (req, res) => {
+// Função para inicializar o cliente do WhatsApp
+const initializeWhatsAppClient = async (id) => {
   const { id } = req.params;
 
-  if (sessions[id]) {
+  if (sessions[id] && (await sessions[id].getState()) === 'CONNECTED') {
     const statusRef = ref(database, `tenants/${id}/session/status`);
     const snapshot = await get(statusRef);
     if (snapshot.exists() && snapshot.val() === 'ready') {
@@ -116,12 +116,11 @@ app.post('/api/whatsapp/start/:id', async (req, res) => {
     }
   }
 
-  console.log(`Iniciando conexão para a sessão: ${id}`);
   const statusRef = ref(database, `tenants/${id}/session/status`);
   const qrRef = ref(database, `tenants/${id}/session/qr`);
-  await set(statusRef, 'INITIALIZING');
 
   try {
+    console.log(`[Sessão ${id}] Configurando cliente...`);
     const client = new Client({
       authStrategy: new LocalAuth({
         clientId: id,
@@ -261,14 +260,24 @@ app.post('/api/whatsapp/start/:id', async (req, res) => {
       delete sessions[id];
     });
 
+    console.log(`[Sessão ${id}] Iniciando cliente...`);
     await client.initialize();
     sessions[id] = client;
+    console.log(`[Sessão ${id}] Cliente inicializado.`);
 
-    res.status(202).json({ success: true, message: `Inicialização da sessão ${id} iniciada. Escaneie o QR Code.` });
   } catch (error) {
     console.error(`[Sessão ${id}] Erro ao inicializar:`, error);
     await set(statusRef, 'ERROR');
-    res.status(500).json({ success: false, error: 'Erro ao inicializar sessão.', details: error.message });
+  }
+};
+
+// Rota para iniciar a conexão do WhatsApp
+app.post('/api/whatsapp/start/:id', async (req, res) => {
+  const { id } = req.params;
+  console.log(`[Sessão ${id}] Recebida requisição para iniciar.`);
+  await set(ref(database, `tenants/${id}/session/status`), 'INITIALIZING');
+  initializeWhatsAppClient(id); // Inicia o processo em segundo plano
+  res.status(202).json({ success: true, message: `Inicialização da sessão ${id} iniciada. Verifique o status para obter o QR code.` });
   }
 });
 
