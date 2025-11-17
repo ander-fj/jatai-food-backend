@@ -10,23 +10,6 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
 const { getDatabase, ref, get, set, remove } = require('firebase/database');
  
-// --- VERIFICAÇÃO DAS VARIÁVEIS DE AMBIENTE ---
-const MONGO_URI = process.env.MONGO_URI;
-if (!MONGO_URI) {
-  console.error('\n[ERRO CRÍTICO] A variável de ambiente MONGO_URI não foi encontrada.');
-  console.error('Por favor, configure a string de conexão do seu MongoDB no seu ambiente de produção ou no arquivo .env.');
-  process.exit(1);
-}
-
-// Conexão com o MongoDB
-mongoose.connect(MONGO_URI)
-  .then(() => console.log('Conexão com MongoDB estabelecida com sucesso!'))
-  .catch(err => {
-    console.error('ERRO ao conectar ao MongoDB:', err);
-    process.exit(1);
-  });
-
-const store = new MongoStore({ mongoose: mongoose });
 const requiredEnvVars = [
   'MONGO_URI',
   'GEMINI_API_KEY',
@@ -48,6 +31,20 @@ if (missingEnvVars.length > 0) {
   console.error('\nPor favor, configure-as no seu ambiente de produção (ex: Render Environment Variables) ou no arquivo .env para desenvolvimento local.\n');
   process.exit(1); // Encerra a aplicação se alguma variável estiver faltando.
 }
+
+// --- VERIFICAÇÃO E CONEXÃO COM O BANCO DE DADOS ---
+const MONGO_URI = process.env.MONGO_URI;
+
+// Conexão com o MongoDB
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('Conexão com MongoDB estabelecida com sucesso!'))
+  .catch(err => {
+    console.error('ERRO ao conectar ao MongoDB:', err);
+    process.exit(1);
+  });
+
+const store = new MongoStore({ mongoose: mongoose });
+
  
 // --- CONFIGURAÇÃO DO FIREBASE ---
 const firebaseConfig = {
