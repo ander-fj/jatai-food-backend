@@ -67,8 +67,17 @@ const database = getDatabase(firebaseApp);
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Middleware para habilitar CORS
-app.use(cors());
+// --- CONFIGURAÇÃO DO CORS ---
+// Lista de origens permitidas. Adicione a URL do seu frontend.
+const allowedOrigins = [
+  'https://www.jataifood.com.br',
+  'https://jatai-food-backend.onrender.com', // Adicione a porta do seu frontend local para testes
+  'http://localhost:5173', // Exemplo com Vite
+];
+
+app.use(cors({
+  origin: allowedOrigins
+}));
 // Middleware para interpretar o corpo das requisições como JSON
 app.use(express.json());
 
