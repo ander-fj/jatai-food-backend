@@ -8,7 +8,7 @@
 firebase-service-account.json
 
 # WhatsApp-Web.js session data
-.wwebjs_auth/
+/.wwebjs_auth/
 
 firebase-credentials.json
 firebase-adminsdk.json
