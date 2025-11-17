@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client } = require('whatsapp-web.js');
+const { MongoStore } = require('whatsapp-web.js-mongo');
+const mongoose = require('mongoose');
 const qrcodeTerminal = require('qrcode-terminal');
 const qrcode = require('qrcode');
 require('dotenv').config();
@@ -9,7 +11,24 @@ const { initializeApp } = require('firebase/app');
 const { getDatabase, ref, get, set, remove } = require('firebase/database');
  
 // --- VERIFICAÇÃO DAS VARIÁVEIS DE AMBIENTE ---
+const MONGO_URI = process.env.MONGO_URI;
+if (!MONGO_URI) {
+  console.error('\n[ERRO CRÍTICO] A variável de ambiente MONGO_URI não foi encontrada.');
+  console.error('Por favor, configure a string de conexão do seu MongoDB no seu ambiente de produção ou no arquivo .env.');
+  process.exit(1);
+}
+
+// Conexão com o MongoDB
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('Conexão com MongoDB estabelecida com sucesso!'))
+  .catch(err => {
+    console.error('ERRO ao conectar ao MongoDB:', err);
+    process.exit(1);
+  });
+
+const store = new MongoStore({ mongoose: mongoose });
 const requiredEnvVars = [
+  'MONGO_URI',
   'GEMINI_API_KEY',
   'FIREBASE_API_KEY',
   'FIREBASE_AUTH_DOMAIN',
@@ -106,7 +125,7 @@ app.post('/api/whatsapp/start/:id', (req, res) => {
   set(statusRef, 'INITIALIZING');
 
   const client = new Client({
-    authStrategy: new LocalAuth({ clientId: id }),
+    authStrategy: store, // Usa a nova estratégia de persistência
     puppeteer: {
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     }
