@@ -1,15 +1,27 @@
 {
-  "name": "jatai-food-backend",
+  "name": "whatsapp-server",
   "version": "1.0.0",
-  "description": "Backend para o sistema Jatai Food",
-  "main": "server.js",
+  "description": "Backend server for WhatsApp integration with JataiFood",
+  "main": "whatsapp-server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node whatsapp-server.js",
+    "dev": "nodemon whatsapp-server.js"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "axios": "^1.7.2",
+    "@google/generative-ai": "^0.24.1",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase-admin": "^11.11.1",
+    "puppeteer": "^18.2.1",
+    "qrcode": "^1.5.3",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.23.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }

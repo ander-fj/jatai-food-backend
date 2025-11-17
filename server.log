@@ -1,0 +1,1040 @@
+[2025-11-11T19:28:06.812Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-11T19:28:06.814Z] 🔗 Frontend permitido de: http://localhost:3000
+[2025-11-11T19:28:06.814Z] 📋 Endpoints disponíveis:
+[2025-11-11T19:28:06.815Z]    POST /api/whatsapp/start/:username
+[2025-11-11T19:28:06.815Z]    GET  /api/whatsapp/qr/:username
+[2025-11-11T19:28:06.815Z]    GET  /api/whatsapp/status/:username
+[2025-11-11T19:28:06.815Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-11T19:28:06.815Z]    POST /api/whatsapp/send-message
+[2025-11-11T19:53:31.918Z] 🔌 Desligando o servidor...
+[2025-11-11T19:53:38.035Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-11T19:53:38.037Z] 🔗 Frontend permitido de: http://localhost:3000
+[2025-11-11T19:53:38.037Z] 📋 Endpoints disponíveis:
+[2025-11-11T19:53:38.037Z]    POST /api/whatsapp/start/:username
+[2025-11-11T19:53:38.037Z]    GET  /api/whatsapp/qr/:username
+[2025-11-11T19:53:38.038Z]    GET  /api/whatsapp/status/:username
+[2025-11-11T19:53:38.038Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-11T19:53:38.038Z]    POST /api/whatsapp/send-message
+[2025-11-11T20:23:47.040Z] 🔌 Desligando o servidor...
+[2025-11-11T20:24:01.121Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-11T20:24:01.123Z] 🔗 Frontend permitido de: http://localhost:3000
+[2025-11-11T20:24:01.123Z] 📋 Endpoints disponíveis:
+[2025-11-11T20:24:01.124Z]    POST /api/whatsapp/start/:username
+[2025-11-11T20:24:01.124Z]    GET  /api/whatsapp/qr/:username
+[2025-11-11T20:24:01.124Z]    GET  /api/whatsapp/status/:username
+[2025-11-11T20:24:01.124Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-11T20:24:01.125Z]    POST /api/whatsapp/send-message
+[2025-11-11T20:29:33.409Z] 🔌 Desligando o servidor...
+[2025-11-11T20:29:44.757Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-11T20:29:44.758Z] 🔗 Frontend permitido de: http://localhost:3000
+[2025-11-11T20:29:44.758Z] 📋 Endpoints disponíveis:
+[2025-11-11T20:29:44.759Z]    POST /api/whatsapp/start/:username
+[2025-11-11T20:29:44.759Z]    GET  /api/whatsapp/qr/:username
+[2025-11-11T20:29:44.759Z]    GET  /api/whatsapp/status/:username
+[2025-11-11T20:29:44.759Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-11T20:29:44.759Z]    POST /api/whatsapp/send-message
+[2025-11-12T01:25:35.104Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T01:25:35.106Z] 🔗 Frontend permitido de: http://localhost:3000
+[2025-11-12T01:25:35.106Z] 📋 Endpoints disponíveis:
+[2025-11-12T01:25:35.106Z]    POST /api/whatsapp/start/:username
+[2025-11-12T01:25:35.106Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T01:25:35.106Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T01:25:35.107Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T01:25:35.107Z]    POST /api/whatsapp/send-message
+[2025-11-12T01:34:36.150Z] 🔌 Desligando o servidor...
+[2025-11-12T01:34:41.595Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T01:34:41.596Z] 🔗 Frontend permitido de: http://localhost:3000
+[2025-11-12T01:34:41.596Z] 📋 Endpoints disponíveis:
+[2025-11-12T01:34:41.596Z]    POST /api/whatsapp/start/:username
+[2025-11-12T01:34:41.597Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T01:34:41.597Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T01:34:41.597Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T01:34:41.597Z]    POST /api/whatsapp/send-message
+[2025-11-12T01:34:49.243Z] 🔌 Desligando o servidor...
+[2025-11-12T01:35:00.115Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T01:35:00.116Z] 🔗 Frontend permitido de: http://localhost:3000
+[2025-11-12T01:35:00.116Z] 📋 Endpoints disponíveis:
+[2025-11-12T01:35:00.116Z]    POST /api/whatsapp/start/:username
+[2025-11-12T01:35:00.117Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T01:35:00.117Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T01:35:00.117Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T01:35:00.117Z]    POST /api/whatsapp/send-message
+[2025-11-12T01:35:25.204Z] Iniciando criação do cliente para: A
+[2025-11-12T01:35:25.235Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:35:27.249Z] Iniciando criação do cliente para: A
+[2025-11-12T01:35:27.253Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:37:32.542Z] 🔌 Desligando o servidor...
+[2025-11-12T01:37:41.669Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T01:37:41.670Z] 🔗 Frontend permitido de: http://localhost:3000
+[2025-11-12T01:37:41.670Z] 📋 Endpoints disponíveis:
+[2025-11-12T01:37:41.670Z]    POST /api/whatsapp/start/:username
+[2025-11-12T01:37:41.670Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T01:37:41.671Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T01:37:41.671Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T01:37:41.671Z]    POST /api/whatsapp/send-message
+[2025-11-12T01:37:58.764Z] 🔌 Desligando o servidor...
+[2025-11-12T01:38:00.634Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T01:38:00.636Z] 🔗 Frontend permitido de: http://localhost:3000
+[2025-11-12T01:38:00.636Z] 📋 Endpoints disponíveis:
+[2025-11-12T01:38:00.637Z]    POST /api/whatsapp/start/:username
+[2025-11-12T01:38:00.637Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T01:38:00.637Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T01:38:00.637Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T01:38:00.637Z]    POST /api/whatsapp/send-message
+[2025-11-12T01:38:13.840Z] 🔌 Desligando o servidor...
+[2025-11-12T01:38:19.573Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T01:38:19.575Z] 🔗 Frontend permitido de: http://localhost:3000
+[2025-11-12T01:38:19.575Z] 📋 Endpoints disponíveis:
+[2025-11-12T01:38:19.575Z]    POST /api/whatsapp/start/:username
+[2025-11-12T01:38:19.575Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T01:38:19.576Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T01:38:19.576Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T01:38:19.576Z]    POST /api/whatsapp/send-message
+[2025-11-12T01:38:24.316Z] Iniciando criação do cliente para: A
+[2025-11-12T01:38:24.339Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:38:25.171Z] Iniciando criação do cliente para: A
+[2025-11-12T01:38:25.174Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:38:28.297Z] Iniciando criação do cliente para: A
+[2025-11-12T01:38:28.300Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:39:36.905Z] Iniciando criação do cliente para: A
+[2025-11-12T01:39:36.908Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:39:38.136Z] Iniciando criação do cliente para: A
+[2025-11-12T01:39:38.139Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:39:45.862Z] Iniciando criação do cliente para: A
+[2025-11-12T01:39:45.865Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:41:48.008Z] 🔌 Desligando o servidor...
+[2025-11-12T01:41:51.782Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T01:41:51.783Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T01:41:51.783Z] 📋 Endpoints disponíveis:
+[2025-11-12T01:41:51.783Z]    POST /api/whatsapp/start/:username
+[2025-11-12T01:41:51.784Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T01:41:51.784Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T01:41:51.784Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T01:41:51.784Z]    POST /api/whatsapp/send-message
+[2025-11-12T01:41:57.706Z] Iniciando criação do cliente para: A
+[2025-11-12T01:41:57.745Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:42:00.659Z] Iniciando criação do cliente para: A
+[2025-11-12T01:42:00.662Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:42:03.833Z] Iniciando criação do cliente para: A
+[2025-11-12T01:42:03.836Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:42:06.536Z] Iniciando criação do cliente para: A
+[2025-11-12T01:42:06.539Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:42:22.274Z] Iniciando criação do cliente para: A
+[2025-11-12T01:42:22.278Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:44:05.817Z] Iniciando criação do cliente para: A
+[2025-11-12T01:44:05.820Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:44:08.440Z] Iniciando criação do cliente para: A
+[2025-11-12T01:44:08.442Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:44:12.605Z] Iniciando criação do cliente para: A
+[2025-11-12T01:44:12.608Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:45:24.925Z] 🔌 Desligando o servidor...
+[2025-11-12T01:46:15.847Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T01:46:15.848Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T01:46:15.849Z] 📋 Endpoints disponíveis:
+[2025-11-12T01:46:15.849Z]    POST /api/whatsapp/start/:username
+[2025-11-12T01:46:15.849Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T01:46:15.849Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T01:46:15.850Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T01:46:15.850Z]    POST /api/whatsapp/send-message
+[2025-11-12T01:46:29.713Z] Iniciando criação do cliente para: A
+[2025-11-12T01:46:29.733Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:46:39.395Z] Iniciando criação do cliente para: A
+[2025-11-12T01:46:39.399Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T01:48:43.948Z] 🔌 Desligando o servidor...
+[2025-11-12T01:49:00.826Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T01:49:00.828Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T01:49:00.828Z] 📋 Endpoints disponíveis:
+[2025-11-12T01:49:00.828Z]    POST /api/whatsapp/start/:username
+[2025-11-12T01:49:00.828Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T01:49:00.829Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T01:49:00.829Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T01:49:00.829Z]    POST /api/whatsapp/send-message
+[2025-11-12T01:59:14.803Z] Iniciando criação do cliente para: A
+[2025-11-12T01:59:14.834Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T13:18:40.225Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T13:18:40.229Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T13:18:40.229Z] 📋 Endpoints disponíveis:
+[2025-11-12T13:18:40.231Z]    POST /api/whatsapp/start/:username
+[2025-11-12T13:18:40.231Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T13:18:40.232Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T13:18:40.232Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T13:18:40.235Z]    POST /api/whatsapp/send-message
+[2025-11-12T13:18:46.269Z] Iniciando criação do cliente para: A
+[2025-11-12T13:18:46.483Z] ❌ Erro CRÍTICO ao inicializar o cliente para A.
+[2025-11-12T13:38:21.488Z] 🔌 Desligando o servidor...
+[2025-11-12T13:39:53.185Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T13:39:53.187Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T13:39:53.187Z] 📋 Endpoints disponíveis:
+[2025-11-12T13:39:53.188Z]    POST /api/whatsapp/start/:username
+[2025-11-12T13:39:53.188Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T13:39:53.188Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T13:39:53.188Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T13:39:53.188Z]    POST /api/whatsapp/send-message
+[2025-11-12T13:40:35.720Z] Iniciando criação do cliente para: A
+[2025-11-12T13:40:45.464Z] QR Code gerado para A.
+[2025-11-12T13:41:11.348Z] 🔒 Cliente A autenticado.
+[2025-11-12T13:41:12.670Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T13:41:15.929Z] Nova mensagem de 5513996781020@c.us: ""
+[2025-11-12T13:41:26.617Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-12T13:42:48.105Z] Desconectando cliente A...
+[2025-11-12T13:42:48.283Z] Sessão para A destruída. Aguardando evento 'disconnected' para limpeza final.
+[2025-11-12T13:42:52.428Z] 🔌 Desligando o servidor...
+[2025-11-12T13:43:16.586Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T13:43:16.587Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T13:43:16.587Z] 📋 Endpoints disponíveis:
+[2025-11-12T13:43:16.588Z]    POST /api/whatsapp/start/:username
+[2025-11-12T13:43:16.588Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T13:43:16.588Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T13:43:16.588Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T13:43:16.589Z]    POST /api/whatsapp/send-message
+[2025-11-12T13:43:26.056Z] Iniciando criação do cliente para: A
+[2025-11-12T13:43:33.841Z] 🔒 Cliente A autenticado.
+[2025-11-12T13:43:34.099Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T13:43:47.458Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-12T13:53:47.630Z] 🔌 Desligando o servidor...
+[2025-11-12T13:53:52.410Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T13:53:52.411Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T13:53:52.411Z] 📋 Endpoints disponíveis:
+[2025-11-12T13:53:52.412Z]    POST /api/whatsapp/start/:username
+[2025-11-12T13:53:52.412Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T13:53:52.412Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T13:53:52.412Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T13:53:52.412Z]    POST /api/whatsapp/send-message
+[2025-11-12T13:55:11.343Z] Iniciando criação do cliente para: A
+[2025-11-12T13:55:22.642Z] 🔒 Cliente A autenticado.
+[2025-11-12T13:55:24.764Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T13:55:40.078Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-12T13:59:21.205Z] Desconectando cliente A...
+[2025-11-12T13:59:21.377Z] Sessão para A destruída. Aguardando evento 'disconnected' para limpeza final.
+[2025-11-12T13:59:24.526Z] 🔌 Desligando o servidor...
+[2025-11-12T13:59:29.699Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T13:59:29.700Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T13:59:29.700Z] 📋 Endpoints disponíveis:
+[2025-11-12T13:59:29.701Z]    POST /api/whatsapp/start/:username
+[2025-11-12T13:59:29.701Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T13:59:29.701Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T13:59:29.701Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T13:59:29.701Z]    POST /api/whatsapp/send-message
+[2025-11-12T13:59:35.978Z] Iniciando criação do cliente para: A
+[2025-11-12T13:59:43.213Z] 🔒 Cliente A autenticado.
+[2025-11-12T13:59:43.707Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T13:59:51.878Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-12T14:09:34.073Z] 🔌 Desligando o servidor...
+[2025-11-12T14:09:37.971Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T14:09:37.972Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T14:09:37.972Z] 📋 Endpoints disponíveis:
+[2025-11-12T14:09:37.973Z]    POST /api/whatsapp/start/:username
+[2025-11-12T14:09:37.973Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T14:09:37.973Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T14:09:37.973Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T14:09:37.973Z]    POST /api/whatsapp/send-message
+[2025-11-12T14:39:49.887Z] 🔌 Desligando o servidor...
+[2025-11-12T14:40:13.580Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T14:40:13.583Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T14:40:13.583Z] 📋 Endpoints disponíveis:
+[2025-11-12T14:40:13.583Z]    POST /api/whatsapp/start/:username
+[2025-11-12T14:40:13.583Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T14:40:13.583Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T14:40:13.584Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T14:40:13.584Z]    POST /api/whatsapp/send-message
+[2025-11-12T14:42:01.718Z] 🔌 Desligando o servidor...
+[2025-11-12T14:42:06.146Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T14:42:06.147Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T14:42:06.147Z] 📋 Endpoints disponíveis:
+[2025-11-12T14:42:06.148Z]    POST /api/whatsapp/start/:username
+[2025-11-12T14:42:06.148Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T14:42:06.148Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T14:42:06.148Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T14:42:06.149Z]    POST /api/whatsapp/send-message
+[2025-11-12T14:43:24.790Z] 🔌 Desligando o servidor...
+[2025-11-12T14:43:29.510Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T14:43:29.512Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T14:43:29.512Z] 📋 Endpoints disponíveis:
+[2025-11-12T14:43:29.513Z]    POST /api/whatsapp/start/:username
+[2025-11-12T14:43:29.513Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T14:43:29.513Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T14:43:29.513Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T14:43:29.514Z]    POST /api/whatsapp/send-message
+[2025-11-12T14:43:46.003Z] Iniciando criação do cliente para: A
+[2025-11-12T14:44:00.995Z] 🔒 Cliente A autenticado.
+[2025-11-12T14:44:02.927Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T14:44:02.942Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T14:44:02.989Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T14:44:03.033Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T14:44:03.780Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T14:44:03.861Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T14:44:04.141Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T14:44:04.249Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T14:44:04.285Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T14:44:04.505Z] Nova mensagem de status@broadcast: "E aquele papo de 1:15 com a pessoa que sempre esteve do seu lado..... Amo esse cara demais..."
+[2025-11-12T14:44:13.079Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-12T14:44:23.405Z] Nova mensagem de 5513996105397@c.us: "Ola"
+[2025-11-12T14:47:13.394Z] 🔌 Desligando o servidor...
+[2025-11-12T15:17:32.036Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T15:17:32.037Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T15:17:32.037Z] 📋 Endpoints disponíveis:
+[2025-11-12T15:17:32.037Z]    POST /api/whatsapp/start/:username
+[2025-11-12T15:17:32.037Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T15:17:32.037Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T15:17:32.037Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T15:17:32.037Z]    POST /api/whatsapp/send-message
+[2025-11-12T15:18:17.031Z] Iniciando criação do cliente para: A
+[2025-11-12T15:18:29.664Z] 🔒 Cliente A autenticado.
+[2025-11-12T15:18:29.938Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T15:18:29.978Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-12T15:18:29.978Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-12T15:18:31.415Z] Nova mensagem de status@broadcast: "PF raiz de boteco...😍😋"
+[2025-11-12T15:18:31.416Z] Nova mensagem de status@broadcast: "PF raiz de boteco...😍😋"
+[2025-11-12T15:18:31.416Z] Nova mensagem de status@broadcast: "PF raiz de boteco...😍😋"
+[2025-11-12T15:22:29.457Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T15:22:29.457Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T15:22:29.457Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T15:22:31.626Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T15:22:31.627Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T15:22:31.627Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T15:22:32.352Z] Nova mensagem de status@broadcast: "J6 7 lugares"
+[2025-11-12T15:22:32.352Z] Nova mensagem de status@broadcast: "J6 7 lugares"
+[2025-11-12T15:22:32.352Z] Nova mensagem de status@broadcast: "J6 7 lugares"
+[2025-11-12T15:22:58.130Z] 🔌 Desligando o servidor...
+[2025-11-12T15:23:01.953Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T15:23:01.954Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T15:23:01.954Z] 📋 Endpoints disponíveis:
+[2025-11-12T15:23:01.954Z]    POST /api/whatsapp/start/:username
+[2025-11-12T15:23:01.954Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T15:23:01.954Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T15:23:01.954Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T15:23:01.954Z]    POST /api/whatsapp/send-message
+[2025-11-12T15:30:21.663Z] 🔌 Desligando o servidor...
+[2025-11-12T15:30:35.306Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T15:30:35.307Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T15:30:35.307Z] 📋 Endpoints disponíveis:
+[2025-11-12T15:30:35.307Z]    POST /api/whatsapp/start/:username
+[2025-11-12T15:30:35.307Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T15:30:35.307Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T15:30:35.307Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T15:30:35.307Z]    POST /api/whatsapp/send-message
+[2025-11-12T15:30:58.884Z] Iniciando criação do cliente para: A
+[2025-11-12T15:31:09.996Z] 🔒 Cliente A autenticado.
+[2025-11-12T15:31:10.277Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T15:31:34.359Z] Nova mensagem de 5513996105397@c.us: "Ola"
+[2025-11-12T15:31:34.360Z] Nova mensagem de 5513996105397@c.us: "Ola"
+[2025-11-12T15:31:36.157Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent: [404 Not Found] models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T15:31:55.233Z] Nova mensagem de 5513996105397@c.us: "Cardápio"
+[2025-11-12T15:31:55.233Z] Nova mensagem de 5513996105397@c.us: "Cardápio"
+[2025-11-12T15:31:55.668Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent: [404 Not Found] models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T15:53:06.948Z] Nova mensagem de status@broadcast: "Aquele ex-amigo que te faz bem sempre... Meu Fechamento😍"
+[2025-11-12T15:53:06.952Z] Nova mensagem de status@broadcast: "Aquele ex-amigo que te faz bem sempre... Meu Fechamento😍"
+[2025-11-12T15:53:06.952Z] Nova mensagem de status@broadcast: "Aquele ex-amigo que te faz bem sempre... Meu Fechamento😍"
+[2025-11-12T16:35:50.478Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:35:50.478Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:35:50.478Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:36:00.529Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:36:00.529Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:36:00.529Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:10.671Z] Nova mensagem de status@broadcast: "Peças usadas e aqui chama"
+[2025-11-12T16:45:10.671Z] Nova mensagem de status@broadcast: "Peças usadas e aqui chama"
+[2025-11-12T16:45:10.671Z] Nova mensagem de status@broadcast: "Peças usadas e aqui chama"
+[2025-11-12T16:45:21.174Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:21.174Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:21.174Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:22.807Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:22.807Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:22.807Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:28.837Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:28.837Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:28.837Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:31.916Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:31.916Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:31.916Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:33.415Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:33.415Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:33.415Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:35.179Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:35.179Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:35.179Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:36.851Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:36.851Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:36.851Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:38.388Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:38.388Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:38.388Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:40.309Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:40.309Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:45:40.309Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:51:15.250Z] Nova mensagem de 551334674543@c.us: "Boa tarde isso Anderson as chaves só são entregues mediante a pagamento da caução ta"
+[2025-11-12T16:51:15.250Z] Nova mensagem de 551334674543@c.us: "Boa tarde isso Anderson as chaves só são entregues mediante a pagamento da caução ta"
+[2025-11-12T16:51:16.822Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent: [404 Not Found] models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T16:56:51.459Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:56:51.459Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:56:51.459Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T16:56:58.217Z] 🔒 Cliente A autenticado.
+[2025-11-12T16:56:58.217Z] 🔒 Cliente A autenticado.
+[2025-11-12T16:56:58.571Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T16:56:58.573Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T16:57:02.678Z] 🔌 Cliente A desconectado: LOGOUT
+[2025-11-12T17:00:28.745Z] 🔌 Desligando o servidor...
+[2025-11-12T17:01:28.334Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T17:01:28.335Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T17:01:28.335Z] 📋 Endpoints disponíveis:
+[2025-11-12T17:01:28.335Z]    POST /api/whatsapp/start/:username
+[2025-11-12T17:01:28.335Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T17:01:28.335Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T17:01:28.335Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T17:01:28.335Z]    POST /api/whatsapp/send-message
+[2025-11-12T17:01:37.440Z] Iniciando criação do cliente para: A
+[2025-11-12T17:01:46.452Z] QR Code gerado para A.
+[2025-11-12T17:02:22.971Z] 🔒 Cliente A autenticado.
+[2025-11-12T17:02:23.820Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T17:02:35.043Z] 🔒 Cliente A autenticado.
+[2025-11-12T17:02:35.044Z] 🔒 Cliente A autenticado.
+[2025-11-12T17:02:35.044Z] 🔒 Cliente A autenticado.
+[2025-11-12T17:02:35.045Z] QR Code gerado para A.
+[2025-11-12T17:02:35.103Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T17:02:35.104Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T17:02:35.104Z] ✅ Cliente A conectado e pronto!
+[2025-11-12T17:02:35.525Z] 🔌 Cliente A desconectado: LOGOUT
+[2025-11-12T17:05:35.041Z] 🔌 Desligando o servidor...
+[2025-11-12T17:05:39.920Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T17:05:39.921Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T17:05:39.921Z] 📋 Endpoints disponíveis:
+[2025-11-12T17:05:39.921Z]    POST /api/whatsapp/start/:username
+[2025-11-12T17:05:39.921Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T17:05:39.921Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T17:05:39.921Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T17:05:39.921Z]    POST /api/whatsapp/send-message
+[2025-11-12T17:14:36.290Z] 🔌 Desligando o servidor...
+[2025-11-12T17:14:40.443Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T17:14:40.444Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T17:14:40.444Z] 📋 Endpoints disponíveis:
+[2025-11-12T17:14:40.444Z]    POST /api/whatsapp/start/:username
+[2025-11-12T17:14:40.444Z]    GET  /api/whatsapp/qr/:username
+[2025-11-12T17:14:40.444Z]    GET  /api/whatsapp/status/:username
+[2025-11-12T17:14:40.444Z]    POST /api/whatsapp/disconnect/:username
+[2025-11-12T17:14:40.444Z]    POST /api/whatsapp/send-message
+[2025-11-12T17:18:06.308Z] 🔌 Desligando o servidor...
+[2025-11-12T17:18:57.675Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T17:18:57.678Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T17:18:57.678Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T17:18:57.678Z]    POST /start/:username
+[2025-11-12T17:18:57.678Z]    GET  /qr/:username
+[2025-11-12T17:18:57.678Z]    GET  /status/:username
+[2025-11-12T17:18:57.678Z]    POST /disconnect/:username
+[2025-11-12T17:18:57.678Z]    POST /send-message
+[2025-11-12T17:23:37.784Z] Iniciando criação do cliente para: A
+[2025-11-12T17:25:37.868Z] Iniciando criação do cliente para: A
+[2025-11-12T17:25:49.298Z] Iniciando criação do cliente para: A
+[2025-11-12T17:27:28.641Z] 🔌 Desligando o servidor...
+[2025-11-12T17:27:38.518Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T17:27:38.519Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T17:27:38.519Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T17:27:38.519Z]    POST /start/:username
+[2025-11-12T17:27:38.519Z]    GET  /qr/:username
+[2025-11-12T17:27:38.519Z]    GET  /status/:username
+[2025-11-12T17:27:38.519Z]    POST /disconnect/:username
+[2025-11-12T17:27:38.519Z]    POST /send-message
+[2025-11-12T17:27:55.971Z] Iniciando criação do cliente para: A
+[2025-11-12T17:29:48.439Z] Iniciando criação do cliente para: A
+[2025-11-12T17:30:06.901Z] Iniciando criação do cliente para: A
+[2025-11-12T17:31:49.386Z] 🔌 Desligando o servidor...
+[2025-11-12T17:34:40.940Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T17:34:40.941Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T17:34:40.941Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T17:34:40.941Z]    POST /start/:username
+[2025-11-12T17:34:40.941Z]    GET  /qr/:username
+[2025-11-12T17:34:40.941Z]    GET  /status/:username
+[2025-11-12T17:34:40.941Z]    POST /disconnect/:username
+[2025-11-12T17:34:40.941Z]    POST /send-message
+[2025-11-12T17:34:48.385Z] Iniciando criação do cliente para: A
+[2025-11-12T17:35:18.390Z] ❌ Timeout: QR Code não gerado para A em 30 segundos.
+[2025-11-12T17:36:48.279Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T17:36:48.280Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T17:36:48.280Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T17:36:48.280Z]    POST /start/:username
+[2025-11-12T17:36:48.280Z]    GET  /qr/:username
+[2025-11-12T17:36:48.280Z]    GET  /status/:username
+[2025-11-12T17:36:48.280Z]    POST /disconnect/:username
+[2025-11-12T17:36:48.280Z]    POST /send-message
+[2025-11-12T17:36:56.336Z] Iniciando criação do cliente para: A
+[2025-11-12T17:37:26.356Z] ❌ Timeout: QR Code não foi gerado para A em 30 segundos.
+[2025-11-12T17:39:33.277Z] 🔌 Desligando o servidor...
+[2025-11-12T17:40:04.678Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T17:40:04.679Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T17:40:04.679Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T17:40:04.679Z]    POST /start/:username
+[2025-11-12T17:40:04.679Z]    GET  /qr/:username
+[2025-11-12T17:40:04.679Z]    GET  /status/:username
+[2025-11-12T17:40:04.679Z]    POST /disconnect/:username
+[2025-11-12T17:40:04.679Z]    POST /send-message
+[2025-11-12T17:40:10.901Z] Iniciando criação do cliente para: A
+[2025-11-12T17:40:40.913Z] ❌ Timeout: QR Code não foi gerado para A em 30 segundos.
+[2025-11-12T17:44:29.313Z] 🔌 Desligando o servidor...
+[2025-11-12T17:44:37.719Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T17:44:37.720Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T17:44:37.720Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T17:44:37.720Z]    POST /start/:username
+[2025-11-12T17:44:37.720Z]    GET  /qr/:username
+[2025-11-12T17:44:37.720Z]    GET  /status/:username
+[2025-11-12T17:44:37.720Z]    POST /disconnect/:username
+[2025-11-12T17:44:37.720Z]    POST /send-message
+[2025-11-12T17:45:18.361Z] 🔌 Desligando o servidor...
+[2025-11-12T17:45:22.295Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T17:45:22.296Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T17:45:22.296Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T17:45:22.296Z]    POST /start/:username
+[2025-11-12T17:45:22.296Z]    GET  /qr/:username
+[2025-11-12T17:45:22.296Z]    GET  /status/:username
+[2025-11-12T17:45:22.296Z]    POST /disconnect/:username
+[2025-11-12T17:45:22.296Z]    POST /send-message
+[2025-11-12T17:45:50.115Z] Iniciando criação do cliente para: A
+[2025-11-12T17:46:20.123Z] ❌ Timeout: QR Code não foi gerado para A em 30 segundos.
+[2025-11-12T17:51:05.519Z] Iniciando criação do cliente para: A
+[2025-11-12T17:51:35.527Z] ❌ Timeout: QR Code não foi gerado para A em 30 segundos.
+[2025-11-12T17:55:44.898Z] Iniciando criação do cliente para: A
+[2025-11-12T17:56:14.910Z] ❌ Timeout: QR Code não foi gerado para A em 30 segundos.
+[2025-11-12T18:06:37.255Z] Iniciando criação do cliente para: A
+[2025-11-12T18:07:07.260Z] ❌ Timeout: QR Code não foi gerado para A em 30 segundos.
+[2025-11-12T18:07:11.434Z] Iniciando criação do cliente para: A
+[2025-11-12T18:07:41.437Z] ❌ Timeout: QR Code não foi gerado para A em 30 segundos.
+[2025-11-12T18:11:53.703Z] 🔌 Desligando o servidor...
+[2025-11-12T18:12:01.746Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T18:12:01.748Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T18:12:01.748Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T18:12:01.748Z]    POST /start/:username
+[2025-11-12T18:12:01.748Z]    GET  /qr/:username
+[2025-11-12T18:12:01.748Z]    GET  /status/:username
+[2025-11-12T18:12:01.748Z]    POST /disconnect/:username
+[2025-11-12T18:12:01.748Z]    POST /send-message
+[2025-11-12T18:12:17.969Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-12T18:12:17.971Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-12T18:12:17.971Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-12T18:12:17.973Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-12T18:12:47.316Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-12T18:13:11.389Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T18:13:13.010Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T18:13:23.822Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T18:13:23.823Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T18:13:23.823Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T18:13:23.824Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-12T18:13:23.925Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T18:13:23.926Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T18:13:23.926Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T18:13:24.658Z] 🔌 [Debug] Evento 'disconnected' recebido para A: LOGOUT
+[2025-11-12T18:18:02.838Z] 🔌 Desligando o servidor...
+[2025-11-12T18:18:06.922Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T18:18:06.926Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T18:18:06.926Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T18:18:06.926Z]    POST /start/:username
+[2025-11-12T18:18:06.926Z]    GET  /qr/:username
+[2025-11-12T18:18:06.926Z]    GET  /status/:username
+[2025-11-12T18:18:06.926Z]    POST /disconnect/:username
+[2025-11-12T18:18:06.926Z]    POST /send-message
+[2025-11-12T18:20:00.159Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-12T18:20:00.160Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-12T18:20:00.161Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-12T18:20:00.161Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-12T18:20:10.749Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-12T18:20:41.435Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T18:20:45.757Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T18:20:45.844Z] Nova mensagem de 5513996105397@c.us: "Ola"
+[2025-11-12T18:20:47.754Z] Nova mensagem de 551127110409@c.us: "Boa tarde"
+[2025-11-12T18:20:49.291Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T18:20:49.355Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T18:20:51.798Z] Nova mensagem de 551127110409@c.us: "TD bem?"
+[2025-11-12T18:20:52.327Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T18:20:54.566Z] Nova mensagem de 5513996781020@c.us: ""
+[2025-11-12T18:20:54.987Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T18:20:58.566Z] Nova mensagem de 551127110409@c.us: "Posso te ligar"
+[2025-11-12T18:20:59.063Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T18:21:32.934Z] Nova mensagem de 5513996105397@c.us: "!ping"
+[2025-11-12T18:21:33.329Z] Resposta 'pong' enviada para 5513996105397@c.us
+[2025-11-12T18:22:17.397Z] 🔌 Desligando o servidor...
+[2025-11-12T18:22:29.044Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T18:22:29.045Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T18:22:29.045Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T18:22:29.045Z]    POST /start/:username
+[2025-11-12T18:22:29.045Z]    GET  /qr/:username
+[2025-11-12T18:22:29.045Z]    GET  /status/:username
+[2025-11-12T18:22:29.045Z]    POST /disconnect/:username
+[2025-11-12T18:22:29.045Z]    POST /send-message
+[2025-11-12T18:23:04.385Z] 🔌 Desligando o servidor...
+[2025-11-12T18:23:14.505Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T18:23:14.506Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T18:23:14.506Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T18:23:14.506Z]    POST /start/:username
+[2025-11-12T18:23:14.506Z]    GET  /qr/:username
+[2025-11-12T18:23:14.506Z]    GET  /status/:username
+[2025-11-12T18:23:14.506Z]    POST /disconnect/:username
+[2025-11-12T18:23:14.506Z]    POST /send-message
+[2025-11-12T18:28:58.990Z] 🔌 Desligando o servidor...
+[2025-11-12T18:29:03.262Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T18:29:03.264Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T18:29:03.264Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T18:29:03.264Z]    POST /start/:username
+[2025-11-12T18:29:03.264Z]    GET  /qr/:username
+[2025-11-12T18:29:03.264Z]    GET  /status/:username
+[2025-11-12T18:29:03.264Z]    POST /disconnect/:username
+[2025-11-12T18:29:03.264Z]    POST /send-message
+[2025-11-12T18:29:19.858Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-12T18:29:19.860Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-12T18:29:19.861Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-12T18:29:19.863Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-12T18:29:31.483Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T18:29:33.189Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T18:31:23.381Z] 🔌 Desligando o servidor...
+[2025-11-12T18:31:29.565Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T18:31:29.567Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T18:31:29.567Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T18:31:29.567Z]    POST /start/:username
+[2025-11-12T18:31:29.567Z]    GET  /qr/:username
+[2025-11-12T18:31:29.567Z]    GET  /status/:username
+[2025-11-12T18:31:29.567Z]    POST /disconnect/:username
+[2025-11-12T18:31:29.567Z]    POST /send-message
+[2025-11-12T18:32:44.701Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-12T18:32:44.703Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-12T18:32:44.703Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-12T18:32:44.704Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-12T18:32:55.391Z] 🔌 [Debug] Evento 'disconnected' recebido para A: LOGOUT
+[2025-11-12T18:33:18.166Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-12T18:33:18.167Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-12T18:33:18.167Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-12T18:33:18.167Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-12T18:33:24.206Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-12T18:33:43.491Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T18:33:45.323Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T18:33:47.534Z] Nova mensagem de 5513996781020@c.us: ""
+[2025-11-12T18:33:49.956Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent: [404 Not Found] models/gemini-pro-vision is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T18:33:51.046Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-12T18:33:51.587Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent: [404 Not Found] models/gemini-pro-vision is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T18:34:02.739Z] Nova mensagem de 5513996105397@c.us: "!ping"
+[2025-11-12T18:34:02.780Z] Resposta 'pong' enviada para 5513996105397@c.us
+[2025-11-12T18:36:56.149Z] Nova mensagem de 5513996105397@c.us: "!ping"
+[2025-11-12T18:36:56.510Z] Resposta 'pong' enviada para 5513996105397@c.us
+[2025-11-12T18:45:40.741Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-12T18:45:42.339Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent: [404 Not Found] models/gemini-pro-vision is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T18:53:45.916Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T19:22:35.276Z] Nova mensagem de 5511954084156@c.us: "Oi"
+[2025-11-12T19:22:35.909Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent: [404 Not Found] models/gemini-pro-vision is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T19:26:42.034Z] Nova mensagem de 5511954084156@c.us: "Ola"
+[2025-11-12T19:26:42.580Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent: [404 Not Found] models/gemini-pro-vision is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T19:28:39.339Z] 🔌 Desligando o servidor...
+[2025-11-12T19:28:43.689Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T19:28:43.693Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T19:28:43.693Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T19:28:43.693Z]    POST /start/:username
+[2025-11-12T19:28:43.693Z]    GET  /qr/:username
+[2025-11-12T19:28:43.693Z]    GET  /status/:username
+[2025-11-12T19:28:43.694Z]    POST /disconnect/:username
+[2025-11-12T19:28:43.694Z]    POST /send-message
+[2025-11-12T19:29:33.796Z] 🔌 Desligando o servidor...
+[2025-11-12T19:29:36.694Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T19:29:36.695Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T19:29:36.695Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T19:29:36.695Z]    POST /start/:username
+[2025-11-12T19:29:36.695Z]    GET  /qr/:username
+[2025-11-12T19:29:36.695Z]    GET  /status/:username
+[2025-11-12T19:29:36.695Z]    POST /disconnect/:username
+[2025-11-12T19:29:36.695Z]    POST /send-message
+[2025-11-12T19:30:52.556Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T19:30:52.557Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T19:30:52.557Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T19:30:52.557Z]    POST /start/:username
+[2025-11-12T19:30:52.557Z]    GET  /qr/:username
+[2025-11-12T19:30:52.557Z]    GET  /status/:username
+[2025-11-12T19:30:52.557Z]    POST /disconnect/:username
+[2025-11-12T19:30:52.557Z]    POST /send-message
+[2025-11-12T19:31:59.547Z] 🔌 Desligando o servidor...
+[2025-11-12T19:32:06.491Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T19:32:06.492Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T19:32:06.492Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T19:32:06.492Z]    POST /start/:username
+[2025-11-12T19:32:06.492Z]    GET  /qr/:username
+[2025-11-12T19:32:06.492Z]    GET  /status/:username
+[2025-11-12T19:32:06.492Z]    POST /disconnect/:username
+[2025-11-12T19:32:06.492Z]    POST /send-message
+[2025-11-12T19:34:09.712Z] 🔌 Desligando o servidor...
+[2025-11-12T19:34:14.329Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T19:34:14.330Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T19:34:14.330Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T19:34:14.330Z]    POST /start/:username
+[2025-11-12T19:34:14.330Z]    GET  /qr/:username
+[2025-11-12T19:34:14.330Z]    GET  /status/:username
+[2025-11-12T19:34:14.330Z]    POST /disconnect/:username
+[2025-11-12T19:34:14.330Z]    POST /send-message
+[2025-11-12T19:34:29.575Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-12T19:34:29.577Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-12T19:34:29.577Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-12T19:34:29.578Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-12T19:34:41.216Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T19:34:41.590Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T19:35:07.734Z] Nova mensagem de 5511954084156@c.us: "Olá"
+[2025-11-12T19:35:09.506Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent: [404 Not Found] models/gemini-1.5-flash-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T19:36:06.929Z] 🔌 Desligando o servidor...
+[2025-11-12T19:36:13.267Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T19:36:13.268Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T19:36:13.268Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T19:36:13.268Z]    POST /start/:username
+[2025-11-12T19:36:13.268Z]    GET  /qr/:username
+[2025-11-12T19:36:13.268Z]    GET  /status/:username
+[2025-11-12T19:36:13.268Z]    POST /disconnect/:username
+[2025-11-12T19:36:13.268Z]    POST /send-message
+[2025-11-12T19:36:49.098Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-12T19:36:49.099Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-12T19:36:49.099Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-12T19:36:49.100Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-12T19:36:57.906Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T19:36:58.491Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T19:37:07.498Z] Nova mensagem de 5511954084156@c.us: "Oi"
+[2025-11-12T19:37:09.162Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent: [404 Not Found] models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2025-11-12T19:40:54.226Z] 🔌 Desligando o servidor...
+[2025-11-12T19:40:58.658Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T19:40:58.659Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T19:40:58.659Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T19:40:58.659Z]    POST /start/:username
+[2025-11-12T19:40:58.659Z]    GET  /qr/:username
+[2025-11-12T19:40:58.659Z]    GET  /status/:username
+[2025-11-12T19:40:58.659Z]    POST /disconnect/:username
+[2025-11-12T19:40:58.659Z]    POST /send-message
+[2025-11-12T19:43:07.811Z] 🔌 Desligando o servidor...
+[2025-11-12T19:43:13.781Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T19:43:13.783Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T19:43:13.783Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T19:43:13.783Z]    POST /start/:username
+[2025-11-12T19:43:13.783Z]    GET  /qr/:username
+[2025-11-12T19:43:13.783Z]    GET  /status/:username
+[2025-11-12T19:43:13.783Z]    POST /disconnect/:username
+[2025-11-12T19:43:13.783Z]    POST /send-message
+[2025-11-12T19:43:33.665Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-12T19:43:33.666Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-12T19:43:33.667Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-12T19:43:33.669Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-12T19:43:41.641Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T19:43:41.980Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T19:44:27.411Z] Nova mensagem de 5511954084156@c.us: "Ola"
+[2025-11-12T19:44:32.995Z] Resposta do Gemini para A: Olá! Bem-vindo(a) ao Secontaf Juntos somos Mais!!
+
+Como posso ajudar você hoje? Se quiser ver nosso cardápio, ele está disponível em: https://www.jataifood.com.br/pedido
+[2025-11-12T19:44:48.095Z] Nova mensagem de 5511954084156@c.us: "Horário"
+[2025-11-12T19:44:51.900Z] Resposta do Gemini para A: Olá! Nosso horário de funcionamento é de **Terça a Domingo, das 18:00h às 23:59h**.
+
+Estamos ansiosos para te atender! 😊
+[2025-11-12T19:45:04.213Z] Nova mensagem de 5511954084156@c.us: "Endereço"
+[2025-11-12T19:45:06.732Z] Resposta do Gemini para A: Olá! Seja bem-vindo(a) ao Secontaf Juntos somos Mais!! 😊
+
+Nosso endereço é: **Avenida Manoel da Nóbrega, 215 - São Vicente**.
+
+Estamos abertos de Terça a Domingo, das 18:00hs às 23:59hs.
+
+Você pode conferir nosso cardápio completo em: https://www.jataifood.com.br/pedido.
+
+Posso te ajudar com mais alguma coisa ou com seu pedido?
+[2025-11-12T19:45:21.434Z] Nova mensagem de 5511954084156@c.us: "Não obrigado"
+[2025-11-12T19:45:26.548Z] Resposta do Gemini para A: Entendido! Sem problemas. Se precisar de algo ou quiser dar uma olhada no nosso cardápio em https://www.jataifood.com.br/pedido, estamos à disposição de Terça a Domingo, das 18:00h às 23:59h. 😉
+[2025-11-12T19:59:12.024Z] Nova mensagem de 551127110409@c.us: ""
+[2025-11-12T19:59:21.551Z] ❌ Erro ao processar mensagem com Gemini AI para A: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [503 Service Unavailable] The model is overloaded. Please try again later.
+[2025-11-12T19:59:28.146Z] Nova mensagem de 551127110409@c.us: ""
+[2025-11-12T19:59:30.702Z] Resposta do Gemini para A: Olá! Seja bem-vindo(a) ao "Secontaf Juntos somos Mais!!".
+
+Parece que a sua mensagem está vazia. Por favor, me diga o que você gostaria de pedir ou qual é a sua pergunta.
+
+Estou aqui para ajudar! Você pode conferir nosso cardápio em: [https://www.jataifood.com.br/pedido](https://www.jataifood.com.br/pedido)
+[2025-11-12T20:10:44.765Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T20:10:44.766Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T20:10:44.766Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T20:10:44.766Z]    POST /start/:username
+[2025-11-12T20:10:44.766Z]    GET  /qr/:username
+[2025-11-12T20:10:44.766Z]    GET  /status/:username
+[2025-11-12T20:10:44.766Z]    POST /disconnect/:username
+[2025-11-12T20:10:44.767Z]    POST /send-message
+[2025-11-12T20:10:54.460Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-12T20:10:54.462Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-12T20:10:54.462Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-12T20:10:54.463Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-12T20:11:07.403Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T20:11:09.707Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T20:11:25.676Z] Nova mensagem de 5511954084156@c.us: "Oi"
+[2025-11-12T20:11:35.162Z] Resposta do Gemini para A: Olá! Bem-vindo ao Secontaf Juntos somos Mais!! Eu sou seu assistente de pedidos. 👋
+
+Como posso te ajudar hoje?
+
+Para te adiantar, nosso horário de funcionamento é de **Terça a Domingo, das 18:00h às 23:59h**.
+Estamos localizados na **Avenida Manoel da Nóbrega, 215 - São Vicente**.
+Você pode conferir nosso cardápio completo aqui: **https://www.jataifood.com.br/pedido**
+
+Se quiser fazer um pedido, me diga o que gostaria! 😊
+[2025-11-12T20:11:38.606Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T20:11:41.579Z] Nova mensagem de status@broadcast: ""
+[2025-11-12T20:11:51.900Z] Nova mensagem de 5511954084156@c.us: "Sim"
+[2025-11-12T20:11:56.008Z] Resposta do Gemini para A: Olá! Para que eu possa te ajudar, preciso de mais detalhes sobre o que você precisa.
+
+Você gostaria de fazer um pedido, consultar nosso cardápio, saber mais sobre nossos horários ou tem alguma outra pergunta?
+
+Lembre-se que nosso cardápio completo está disponível em: https://www.jataifood.com.br/pedido
+
+Estamos abertos de Terça a Domingo, das 18:00hs às 23:59hs.
+
+Aguardo suas informações!
+[2025-11-12T20:12:09.389Z] Nova mensagem de 5511954084156@c.us: "Fazer um pedido"
+[2025-11-12T20:12:15.489Z] Resposta do Gemini para A: Olá! Ótimo! Fico feliz em te ajudar com seu pedido!
+
+Para que eu possa registrar seu pedido, preciso de mais algumas informações. Por favor, me diga:
+
+1.  **Quais itens do nosso cardápio você gostaria e em que quantidade?** (Você pode consultar nosso cardápio completo em: https://www.jataifood.com.br/pedido)
+2.  **Qual o seu nome completo?**
+3.  **Qual o seu número de telefone?**
+4.  **Qual o endereço de entrega?** (Nosso endereço é Avenida Manoel da Nóbrega, 215 - São Vicente, caso seja retirada.)
+5.  **Qual será a forma de pagamento?** (Dinheiro, Cartão de Crédito/Débito, Pix?)
+
+Lembrando que nosso horário de funcionamento é de **Terça a Domingo das 18:00hs ás 23:59hs**.
+
+Assim que tiver essas informações, consigo prosseguir! 😊
+[2025-11-12T21:37:52.176Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-12T21:37:52.177Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-12T21:37:52.177Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-12T21:37:52.177Z]    POST /start/:username
+[2025-11-12T21:37:52.177Z]    GET  /qr/:username
+[2025-11-12T21:37:52.177Z]    GET  /status/:username
+[2025-11-12T21:37:52.177Z]    POST /disconnect/:username
+[2025-11-12T21:37:52.177Z]    POST /send-message
+[2025-11-12T21:54:10.527Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-12T21:54:10.562Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-12T21:54:10.563Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-12T21:54:10.569Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-12T21:54:22.880Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-12T21:54:23.247Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-12T21:54:45.272Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-12T21:54:52.153Z] Resposta do Gemini para A: Olá! Sou seu assistente de pedidos do Secontaf Juntos somos Mais!!. Como posso te ajudar hoje? 😊
+
+Você pode conferir nosso cardápio completo em: https://www.jataifood.com.br/pedido
+[2025-11-13T00:36:23.174Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-13T00:36:23.175Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-13T00:36:23.175Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-13T00:36:23.175Z]    POST /start/:username
+[2025-11-13T00:36:23.175Z]    GET  /qr/:username
+[2025-11-13T00:36:23.175Z]    GET  /status/:username
+[2025-11-13T00:36:23.175Z]    POST /disconnect/:username
+[2025-11-13T00:36:23.175Z]    POST /send-message
+[2025-11-13T00:37:02.147Z] 🔌 Desligando o servidor...
+[2025-11-13T00:37:10.179Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-13T00:37:10.181Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-13T00:37:10.182Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-13T00:37:10.182Z]    POST /start/:username
+[2025-11-13T00:37:10.182Z]    GET  /qr/:username
+[2025-11-13T00:37:10.182Z]    GET  /status/:username
+[2025-11-13T00:37:10.182Z]    POST /disconnect/:username
+[2025-11-13T00:37:10.182Z]    POST /send-message
+[2025-11-13T01:02:14.638Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-13T01:02:14.773Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-13T01:02:14.774Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-13T01:02:14.817Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-13T01:02:19.787Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-13T01:02:19.788Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-13T01:02:19.788Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-13T01:02:19.788Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-13T01:02:27.524Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-13T01:02:27.883Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-13T01:02:27.890Z] Nova mensagem de status@broadcast: ""
+[2025-11-13T01:02:27.951Z] Nova mensagem de status@broadcast: ""
+[2025-11-13T01:02:28.019Z] Nova mensagem de status@broadcast: "11 96638 7447  📲"
+[2025-11-13T01:02:29.335Z] Nova mensagem de status@broadcast: "✌🏻"
+[2025-11-13T01:02:52.604Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-13T01:02:59.738Z] Resposta do Gemini para A: Oi! Seja muito bem-vindo ao Secontaf Juntos somos Mais!!
+
+Como posso te ajudar hoje? Você gostaria de ver nosso cardápio ou fazer um pedido?
+
+Nosso cardápio está em: https://www.jataifood.com.br/pedido
+
+Lembrando que nosso horário de funcionamento é de Terça a Domingo, das 18:00hs às 23:59hs.
+[2025-11-13T01:03:18.147Z] Nova mensagem de 5513996105397@c.us: "Queria fazer um pedido"
+[2025-11-13T01:03:25.173Z] Resposta do Gemini para A: ```json
+{
+  "status_pedido": "incompleto",
+  "mensagem_assistente": "Olá! Que ótimo que você quer fazer um pedido no Secontaf Juntos somos Mais!! 😊 Para que eu possa te ajudar, por favor, me diga quais itens você gostaria de pedir (com as quantidades), seu nome, telefone, endereço de entrega e forma de pagamento. Você pode ver nosso cardápio completo em: https://www.jataifood.com.br/pedido",
+  "detalhes_extraidos": {
+    "itens": [],
+    "nome_cliente": null,
+    "telefone_cliente": null,
+    "endereco_entrega": null,
+    "forma_pagamento": null
+  }
+}
+```
+[2025-11-13T01:04:21.667Z] Nova mensagem de 5513996105397@c.us: "Queria fazer um pedido"
+[2025-11-13T01:04:27.349Z] Resposta do Gemini para A: Olá! Que ótimo que você quer fazer um pedido no Secontaf Juntos somos Mais!!
+
+Para que eu possa te ajudar, por favor, me diga quais itens você gostaria e as quantidades. Você pode consultar nosso cardápio completo em: https://www.jataifood.com.br/pedido.
+
+Além disso, preciso do seu nome, telefone, endereço completo para entrega e a forma de pagamento.
+
+Lembrando que nosso horário de funcionamento é de Terça a Domingo, das 18:00hs às 23:59hs.
+
+Aguardamos seu pedido!
+[2025-11-13T01:05:41.251Z] Nova mensagem de 5513996105397@c.us: "Pode ser por aqui?, você tem algum modelo"
+[2025-11-13T01:05:47.674Z] Resposta do Gemini para A: Olá! Sim, pode ser por aqui mesmo para fazer seu pedido!
+
+Você perguntou sobre um "modelo" – para que eu possa te ajudar a montar seu pedido, por favor, me informe os seguintes detalhes:
+
+1.  **Itens e Quantidades** que você deseja do nosso cardápio. Você pode consultar nosso menu completo aqui: [https://www.jataifood.com.br/pedido](https://www.jataifood.com.br/pedido)
+2.  Seu **Nome Completo**.
+3.  Seu **Telefone** para contato.
+4.  O **Endereço** para entrega (se for diferente do nosso, ou se você for retirar aqui). Lembre-se que nosso endereço é: Avenida Manoel da Nóbrega, 215 - São Vicente.
+5.  A **Forma de Pagamento** (Dinheiro, Cartão de Crédito, Débito, Pix).
+
+Lembrando que nosso horário de funcionamento é de Terça a Domingo, das 18:00hs às 23:59hs.
+
+Estou à disposição para te ajudar!
+[2025-11-13T01:15:25.534Z] Desconectando cliente A...
+[2025-11-13T01:15:25.569Z] ❌ [Debug] Erro CRÍTICO durante client.initialize() para A: Protocol error (Runtime.callFunctionOn): Target closed.
+[2025-11-13T01:15:25.859Z] Sessão para A destruída. Aguardando evento 'disconnected' para limpeza final.
+[2025-11-13T01:22:13.525Z] Nova mensagem de status@broadcast: ""
+[2025-11-13T01:25:55.891Z] 🔌 Desligando o servidor...
+[2025-11-15T01:20:23.011Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-15T01:20:23.012Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-15T01:20:23.012Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-15T01:20:23.012Z]    POST /start/:username
+[2025-11-15T01:20:23.012Z]    GET  /qr/:username
+[2025-11-15T01:20:23.012Z]    GET  /status/:username
+[2025-11-15T01:20:23.012Z]    POST /disconnect/:username
+[2025-11-15T01:20:23.012Z]    POST /send-message
+[2025-11-15T01:20:43.694Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-15T01:20:43.695Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-15T01:20:43.696Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-15T01:20:43.697Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-15T01:20:52.793Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-15T01:20:52.793Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-15T01:20:52.793Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-15T01:20:52.794Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-15T01:21:13.699Z] ❌ [Debug] Timeout de 30s atingido. QR Code não foi gerado para A.
+[2025-11-15T01:37:09.418Z] ❌ [Debug] Erro CRÍTICO durante client.initialize() para A: Protocol error (Runtime.callFunctionOn): Target closed.
+[2025-11-15T02:21:31.991Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-15T02:21:31.992Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-15T02:21:31.992Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-15T02:21:31.992Z]    POST /start/:username
+[2025-11-15T02:21:31.992Z]    GET  /qr/:username
+[2025-11-15T02:21:31.992Z]    GET  /status/:username
+[2025-11-15T02:21:31.992Z]    POST /disconnect/:username
+[2025-11-15T02:21:31.992Z]    POST /send-message
+[2025-11-15T02:21:42.451Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-15T02:21:42.453Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-15T02:21:42.453Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-15T02:21:42.455Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-15T02:22:00.868Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-15T02:22:03.683Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-15T02:22:22.485Z] Nova mensagem de 5513996105397@c.us: "Oi"
+[2025-11-15T02:22:31.456Z] Resposta do Gemini para A: Olá! Bem-vindo(a) ao Secontaf Juntos somos Mais!! 😊
+
+Como posso te ajudar hoje? Para dar uma olhada no nosso cardápio, acesse: https://www.jataifood.com.br/pedido.
+
+Estamos abertos de Terça a Domingo, das 18:00hs às 23:59hs.
+[2025-11-15T02:22:57.259Z] Nova mensagem de 5513996105397@c.us: "Endereço"
+[2025-11-15T02:22:59.982Z] Resposta do Gemini para A: Olá! Seja bem-vindo ao Secontaf Juntos somos Mais!!
+
+Nosso endereço é: **Avenida Manoel da Nóbrega, 215 - São Vicente**.
+
+Se precisar de mais alguma informação ou quiser fazer seu pedido, estou à disposição! 😊
+[2025-11-16T18:31:23.755Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-16T18:31:23.756Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-16T18:31:23.756Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-16T18:31:23.756Z]    POST /start/:username
+[2025-11-16T18:31:23.756Z]    GET  /qr/:username
+[2025-11-16T18:31:23.756Z]    GET  /status/:username
+[2025-11-16T18:31:23.756Z]    POST /disconnect/:username
+[2025-11-16T18:31:23.756Z]    POST /send-message
+[2025-11-16T18:32:12.016Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-16T18:32:12.018Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-16T18:32:12.018Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-16T18:32:12.020Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-16T18:32:29.071Z] 🔌 [Debug] Evento 'disconnected' recebido para A: LOGOUT
+[2025-11-16T18:33:08.137Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-16T18:33:08.138Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-16T18:33:08.138Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-16T18:33:08.138Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-16T18:33:18.485Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:34:08.714Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:34:10.261Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:34:27.561Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:34:27.562Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:34:27.562Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:34:27.562Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:34:27.636Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:34:27.638Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:34:27.638Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:34:28.649Z] 🔌 [Debug] Evento 'disconnected' recebido para A: LOGOUT
+[2025-11-16T18:35:17.880Z] 🔌 Desligando o servidor...
+[2025-11-16T18:35:26.268Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-16T18:35:26.269Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-16T18:35:26.269Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-16T18:35:26.269Z]    POST /start/:username
+[2025-11-16T18:35:26.269Z]    GET  /qr/:username
+[2025-11-16T18:35:26.269Z]    GET  /status/:username
+[2025-11-16T18:35:26.269Z]    POST /disconnect/:username
+[2025-11-16T18:35:26.269Z]    POST /send-message
+[2025-11-16T18:35:44.972Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-16T18:35:44.974Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-16T18:35:44.974Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-16T18:35:44.975Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-16T18:35:52.238Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:36:52.047Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:37:12.062Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:37:32.064Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:37:52.067Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:38:16.136Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:38:17.971Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:38:27.097Z] Nova mensagem de 5511939364247@c.us: ""
+[2025-11-16T18:38:27.358Z] Nova mensagem de 5511939364247@c.us: "Ola"
+[2025-11-16T18:38:28.612Z] ⚠️  Chave da API do Gemini não encontrada para A no Firebase.
+[2025-11-16T18:38:28.613Z] ⚠️  Chave da API do Gemini não encontrada para A no Firebase.
+[2025-11-16T18:38:28.618Z] ❌ Erro ao processar mensagem com Gemini AI para A: Evaluation failed: t
+[2025-11-16T18:38:28.884Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:38:28.884Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:38:28.885Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:38:28.886Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:38:28.949Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:38:28.949Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:38:28.949Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:38:29.488Z] 🔌 [Debug] Evento 'disconnected' recebido para A: LOGOUT
+[2025-11-16T18:40:22.051Z] 🔌 Desligando o servidor...
+[2025-11-16T18:40:28.910Z] 🚀 Servidor WhatsApp rodando na porta 3001
+[2025-11-16T18:40:28.912Z] 🔗 Frontend permitido de: http://localhost:5173
+[2025-11-16T18:40:28.912Z] 📋 Endpoints disponíveis (prefixo /api/whatsapp):
+[2025-11-16T18:40:28.912Z]    POST /start/:username
+[2025-11-16T18:40:28.912Z]    GET  /qr/:username
+[2025-11-16T18:40:28.912Z]    GET  /status/:username
+[2025-11-16T18:40:28.912Z]    POST /disconnect/:username
+[2025-11-16T18:40:28.912Z]    POST /send-message
+[2025-11-16T18:40:40.432Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-16T18:40:40.434Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-16T18:40:40.434Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-16T18:40:40.435Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-16T18:40:48.500Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:41:48.221Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:42:08.237Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:42:08.252Z] Tentativa de iniciar cliente já existente: A com status QR_CODE
+[2025-11-16T18:42:09.740Z] Tentativa de iniciar cliente já existente: A com status QR_CODE
+[2025-11-16T18:42:26.230Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:42:27.193Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:42:40.132Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:42:40.133Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:42:40.133Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:42:40.134Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:42:40.207Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:42:40.209Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:42:40.209Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:42:40.699Z] 🔌 [Debug] Evento 'disconnected' recebido para A: LOGOUT
+[2025-11-16T18:53:00.159Z] [Debug] 1. Entrando na função createClient para: A
+[2025-11-16T18:53:00.163Z] [Debug] 2. Objeto cliente criado. Configurando eventos.
+[2025-11-16T18:53:00.163Z] [Debug] 3. Eventos configurados. Chamando client.initialize().
+[2025-11-16T18:53:00.164Z] [Debug] 4. Chamada para client.initialize() feita. Aguardando eventos...
+[2025-11-16T18:53:10.383Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:54:10.134Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:54:30.145Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:54:43.371Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:54:44.939Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:54:55.770Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:54:55.770Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:54:55.770Z] 🔒 [Debug] Evento 'authenticated' recebido para A.
+[2025-11-16T18:54:55.772Z] [Debug] Evento 'qr' recebido para A.
+[2025-11-16T18:54:55.836Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:54:55.836Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:54:55.837Z] ✅ [Debug] Evento 'ready' recebido. Cliente A conectado.
+[2025-11-16T18:54:56.393Z] 🔌 [Debug] Evento 'disconnected' recebido para A: LOGOUT
+[2025-11-16T18:58:06.647Z] 🔌 Desligando o servidor...

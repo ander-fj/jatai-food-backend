@@ -1,5 +1,15 @@
+# Dependencies
+/node_modules
+
 # Environment variables
 .env
 
-# Node dependencies
-/node_modules
+# Firebase credentials
+firebase-service-account.json
+
+# WhatsApp-Web.js session data
+.wwebjs_auth/
+
+firebase-credentials.json
+firebase-adminsdk.json
+*.log
