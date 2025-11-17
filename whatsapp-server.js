@@ -106,10 +106,6 @@ const initializeWhatsAppClient = async (sessionId) => {
       ],
       headless: true,
     },
-    webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-    }
   });
 
   sessions[sessionId] = { client, status: 'INITIALIZING', qrAttempts: 0 };
@@ -217,7 +213,7 @@ const initializeWhatsAppClient = async (sessionId) => {
     // Timeout de 60 segundos para inicialização
     const initPromise = client.initialize();
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout na inicialização')), 60000)
+      setTimeout(() => reject(new Error('Timeout na inicialização')), 120000)
     );
     
     await Promise.race([initPromise, timeoutPromise]);
