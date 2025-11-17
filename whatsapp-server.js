@@ -1,17 +1,14 @@
 const express = require('express');
 const cors = require('cors');
-const { Client, RemoteAuth } = require('whatsapp-web.js');
-const { MongoStore } = require('wwebjs-mongo');
-const mongoose = require('mongoose');
+const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
 const qrcode = require('qrcode');
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
 const { getDatabase, ref, get, set, remove } = require('firebase/database');
- 
+
 const requiredEnvVars = [
-  'MONGO_URI',
   'GEMINI_API_KEY',
   'FIREBASE_API_KEY',
   'FIREBASE_AUTH_DOMAIN',
@@ -21,26 +18,15 @@ const requiredEnvVars = [
   'FIREBASE_MESSAGING_SENDER_ID',
   'FIREBASE_APP_ID',
 ];
- 
+
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
- 
+
 if (missingEnvVars.length > 0) {
   console.error('\n[ERRO CRÍTICO] As seguintes variáveis de ambiente essenciais não foram encontradas:');
   missingEnvVars.forEach(v => console.error(`- ${v}`));
   console.error('\nPor favor, configure-as no seu ambiente de produção (ex: Render Environment Variables) ou no arquivo .env para desenvolvimento local.\n');
   process.exit(1);
 }
-
-// --- VERIFICAÇÃO E CONEXÃO COM O BANCO DE DADOS ---
-const MONGO_URI = process.env.MONGO_URI;
-
-// Conexão com o MongoDB
-mongoose.connect(MONGO_URI)
-  .then(() => console.log('Conexão com MongoDB estabelecida com sucesso!'))
-  .catch(err => {
-    console.error('ERRO ao conectar ao MongoDB:', err);
-    process.exit(1);
-  });
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
 const firebaseConfig = {
@@ -131,15 +117,9 @@ app.post('/api/whatsapp/start/:id', async (req, res) => {
   await set(statusRef, 'INITIALIZING');
 
   try {
-    // Configuração do MongoStore
-    const store = new MongoStore({ mongoose: mongoose });
-
     const client = new Client({
-      authStrategy: new RemoteAuth({
-        store: store,
+      authStrategy: new LocalAuth({
         clientId: id,
-        dataPath: `./.wwebjs_auth/session-${id}`,
-        backupSyncIntervalMs: 300000
       }),
       puppeteer: {
         args: [
