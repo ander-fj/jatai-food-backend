@@ -22,7 +22,7 @@
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.23.0",
     "mongoose": "^8.0.0",
-    "whatsapp-web.js-mongo": "^1.0.0"
+    "wwebjs-mongo": "^1.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
