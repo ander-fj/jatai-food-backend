@@ -6,7 +6,7 @@ const qrcode = require('qrcode');
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
-const { getDatabase, ref, get } = require('firebase/database');
+const { getDatabase, ref, get, set, remove } = require('firebase/database');
  
 // --- VERIFICAÇÃO DAS VARIÁVEIS DE AMBIENTE ---
 const requiredEnvVars = [
@@ -55,12 +55,8 @@ app.use(express.json());
 
 // Armazena as sessões dos clientes. A chave é o 'id' da sessão.
 const sessions = {};
-const sessionChatMappings = {}; // Mapeia qual cliente (id) está associado a quais conversas de chat (chatId)
-// Armazena o status de cada sessão para ser consultado pela API.
-const sessionStatus = {};
-// Armazena os QR codes de cada sessão.
-const sessionQrCodes = {};
-// Armazena as sessões de chat da IA para manter o histórico.
+const sessionChatMappings = {}; // Mapeia qual cliente (id) está associado a quais conversas de chat (chatId). Isso pode ser mantido em memória ou também movido.
+// Armazena as sessões de chat da IA para manter o histórico. A limpeza disso já está sendo tratada.
 let chatSessions = {};
 
 app.get('/', (req, res) => {
@@ -68,28 +64,31 @@ app.get('/', (req, res) => {
 });
 
 // Rota para verificar o status da conexão
-app.get('/api/whatsapp/status/:id', (req, res) => {
+app.get('/api/whatsapp/status/:id', async (req, res) => {
   const { id } = req.params;
-  const status = sessionStatus[id] || 'disconnected';
-  // A linha abaixo foi comentada para evitar o excesso de logs no console.
-  // console.log(`Verificando status para a sessão ${id}: ${status}`);
-  res.json({ status: status, message: `Sessão ${id} está ${status}.` });
+  try {
+    const statusRef = ref(database, `tenants/${id}/session/status`);
+    const snapshot = await get(statusRef);
+    const status = snapshot.exists() ? snapshot.val() : 'disconnected';
+    res.json({ status: status, message: `Sessão ${id} está ${status}.` });
+  } catch (error) {
+    res.status(500).json({ status: 'disconnected', message: 'Erro ao buscar status.' });
+  }
 });
 
 // Rota para obter o QR code
-app.get('/api/whatsapp/qr/:id', (req, res) => {
+app.get('/api/whatsapp/qr/:id', async (req, res) => {
   const { id } = req.params;
-  const qr = sessionQrCodes[id];
-  if (qr) {
-    qrcode.toDataURL(qr, (err, url) => {
-      if (err) {
-        res.status(500).json({ error: 'Erro ao gerar QR code.' });
-      } else {
-        res.json({ qr: url });
-      }
-    });
-  } else {
-    res.status(404).json({ error: 'QR code não encontrado.' });
+  try {
+    const qrRef = ref(database, `tenants/${id}/session/qr`);
+    const snapshot = await get(qrRef);
+    if (snapshot.exists()) {
+      res.json({ qr: snapshot.val() });
+    } else {
+      res.status(404).json({ error: 'QR code não encontrado.' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar QR code.' });
   }
 });
 
@@ -97,12 +96,14 @@ app.get('/api/whatsapp/qr/:id', (req, res) => {
 app.post('/api/whatsapp/start/:id', (req, res) => {
   const { id } = req.params;
 
-  if (sessions[id] && sessionStatus[id] === 'ready') {
+  if (sessions[id] && sessions[id].pupPage) { // Uma verificação mais segura de que o cliente está ativo
     return res.status(200).json({ success: true, message: `Sessão ${id} já está conectada.` });
   }
 
   console.log(`Iniciando conexão para a sessão: ${id}`);
-  sessionStatus[id] = 'INITIALIZING';
+  const statusRef = ref(database, `tenants/${id}/session/status`);
+  const qrRef = ref(database, `tenants/${id}/session/qr`);
+  set(statusRef, 'INITIALIZING');
 
   const client = new Client({
     authStrategy: new LocalAuth({ clientId: id }),
@@ -114,15 +115,18 @@ app.post('/api/whatsapp/start/:id', (req, res) => {
   client.on('qr', (qr) => {
     console.log(`QR Code para a sessão ${id}:`);
     qrcodeTerminal.generate(qr, { small: true });
-    sessionStatus[id] = 'QR_CODE';
-    sessionQrCodes[id] = qr;
+    set(statusRef, 'QR_CODE');
+    // Gera e armazena o QR Code como uma data URL diretamente
+    qrcode.toDataURL(qr, (err, url) => {
+      if (!err) set(qrRef, url);
+    });
   });
 
   client.on('ready', () => {
     console.log(`Sessão ${id} conectada com sucesso!`);
-    sessionStatus[id] = 'ready';
+    set(statusRef, 'ready');
     // Limpa o QR code após a conexão
-    delete sessionQrCodes[id];
+    remove(qrRef);
   });
   
   // Inicializa o mapeamento de chats para esta sessão
@@ -206,7 +210,9 @@ app.post('/api/whatsapp/start/:id', (req, res) => {
 
   client.on('disconnected', (reason) => {
     console.log(`Sessão ${id} foi desconectada. Razão:`, reason);
-    delete sessionQrCodes[id];
+    const sessionRef = ref(database, `tenants/${id}/session`);
+    remove(sessionRef); // Limpa status e QR do Firebase
+
     // Limpa as sessões de chat da IA associadas a esta instância do WhatsApp
     Object.keys(chatSessions).forEach(key => {
       if (sessions[id]?.info?.wid?.user === key.split('@')[0]) {
@@ -220,7 +226,6 @@ app.post('/api/whatsapp/start/:id', (req, res) => {
     }
     client.destroy();
     delete sessions[id];
-    sessionStatus[id] = 'disconnected';
   });
 
   client.initialize();
@@ -241,7 +246,8 @@ app.post('/api/whatsapp/stop/:id', async (req, res) => {
     res.status(200).json({ success: true, message: `Sessão ${id} desconectada.` });
   } else {
     // Se não houver cliente, apenas limpa o status
-    sessionStatus[id] = 'disconnected';
+    const statusRef = ref(database, `tenants/${id}/session/status`);
+    set(statusRef, 'disconnected');
     res.status(404).json({ success: false, error: `Sessão ${id} não encontrada.` });
   }
 });
@@ -257,7 +263,10 @@ app.post('/api/whatsapp/send-message/:id', async (req, res) => {
 
   const client = sessions[id];
 
-  if (!client || sessionStatus[id] !== 'ready') {
+  const statusRef = ref(database, `tenants/${id}/session/status`);
+  const snapshot = await get(statusRef);
+
+  if (!client || !snapshot.exists() || snapshot.val() !== 'ready') {
     return res.status(404).json({ success: false, error: `Sessão ${id} não está conectada ou não foi encontrada.` });
   }
 
