@@ -13,4 +13,3 @@ firebase-service-account.json
 firebase-credentials.json
 firebase-adminsdk.json
 *.log
-*.log
