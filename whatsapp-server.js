@@ -7,13 +7,29 @@ require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
 const { getDatabase, ref, get } = require('firebase/database');
-
-if (!process.env.GEMINI_API_KEY) {
-  console.error("\n[ERRO CRÍTICO] A variável de ambiente 'GEMINI_API_KEY' não foi encontrada.");
-  console.error("Esta chave é essencial para a comunicação com a IA. Por favor, configure-a no seu arquivo .env.\n");
-  process.exit(1);
+ 
+// --- VERIFICAÇÃO DAS VARIÁVEIS DE AMBIENTE ---
+const requiredEnvVars = [
+  'GEMINI_API_KEY',
+  'FIREBASE_API_KEY',
+  'FIREBASE_AUTH_DOMAIN',
+  'FIREBASE_DATABASE_URL',
+  'FIREBASE_PROJECT_ID',
+  'FIREBASE_STORAGE_BUCKET',
+  'FIREBASE_MESSAGING_SENDER_ID',
+  'FIREBASE_APP_ID',
+  // 'GEMINI_MODEL_NAME', // Opcional, mas recomendado
+];
+ 
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+ 
+if (missingEnvVars.length > 0) {
+  console.error('\n[ERRO CRÍTICO] As seguintes variáveis de ambiente essenciais não foram encontradas:');
+  missingEnvVars.forEach(v => console.error(`- ${v}`));
+  console.error('\nPor favor, configure-as no seu ambiente de produção (ex: Render Environment Variables) ou no arquivo .env para desenvolvimento local.\n');
+  process.exit(1); // Encerra a aplicação se alguma variável estiver faltando.
 }
-
+ 
 // --- CONFIGURAÇÃO DO FIREBASE ---
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
@@ -170,7 +186,8 @@ app.post('/api/whatsapp/start/:id', (req, res) => {
         `;
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", systemInstruction });
+        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash"; // Usa a variável ou um padrão
+        const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
         chatSessions[chatId] = model.startChat({
           history: [], // Começa com histórico vazio
         });
@@ -257,25 +274,36 @@ app.post('/api/whatsapp/send-message/:id', async (req, res) => {
 });
 
 // Rota para atualizar a configuração do restaurante
-app.post('/api/config/update/:id', (req, res) => {
+app.post('/api/config/update/:id', async (req, res) => {
   const { id } = req.params; // O 'id' da sessão/tenant
   const newData = req.body;
 
   if (!newData || Object.keys(newData).length === 0) {
     return res.status(400).json({ success: false, error: 'Nenhum dado fornecido para atualização.' });
   }
+  
+  try {
+    // Importe a função 'set' do firebase/database no topo do arquivo
+    // const { getDatabase, ref, get, set } = require('firebase/database');
+    const configRef = ref(database, `tenants/${id}/whatsappConfig`);
+    // ATENÇÃO: O 'set' substitui todos os dados no local. Se quiser apenas atualizar, use 'update'.
+    // Para usar 'update', importe-o e chame update(configRef, newData);
+    await set(configRef, newData);
 
-  // Limpa as sessões de chat da IA que pertencem a este tenant para forçar a recriação com as novas instruções
-  if (sessionChatMappings[id]) {
-    sessionChatMappings[id].forEach(chatId => {
-      if (chatSessions[chatId]) {
-        delete chatSessions[chatId];
-      }
-    });
+    // Limpa as sessões de chat da IA que pertencem a este tenant para forçar a recriação com as novas instruções
+    if (sessionChatMappings[id]) {
+      sessionChatMappings[id].forEach(chatId => {
+        if (chatSessions[chatId]) {
+          delete chatSessions[chatId];
+        }
+      });
+    }
+    console.log(`[Sessão ${id}] Configurações do assistente atualizadas com sucesso no Firebase! As sessões de IA foram reiniciadas.`);
+    res.status(200).json({ success: true, message: 'Configurações atualizadas e sessões de IA reiniciadas.' });
+  } catch (error) {
+    console.error(`[Sessão ${id}] Erro ao salvar configuração no Firebase:`, error);
+    res.status(500).json({ success: false, error: 'Erro ao salvar a configuração no servidor.' });
   }
-
-  console.log(`[Sessão ${id}] Configurações do assistente atualizadas com sucesso! As sessões de IA foram reiniciadas.`);
-  res.status(200).json({ success: true, message: 'Configurações atualizadas e sessões de IA reiniciadas.' });
 });
 
 app.listen(port, () => {

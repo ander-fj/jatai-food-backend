@@ -14,6 +14,8 @@ interface WhatsAppConfig {
   welcomeMessage: string;
 }
 
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 const WhatsAppAttendanceSection: React.FC = () => {
   const { username } = useAuth();
   const [config, setConfig] = useState<WhatsAppConfig>({
@@ -61,12 +63,12 @@ const WhatsAppAttendanceSection: React.FC = () => {
 
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`http://localhost:3001/api/whatsapp/status/${username}`);
+        const response = await fetch(`${apiUrl}/api/whatsapp/status/${username}`);
         const data = await response.json();
         setConnectionStatus(data.status || 'disconnected');
 
         if (data.status === 'QR_CODE') {
-          const qrResponse = await fetch(`http://localhost:3001/api/whatsapp/qr/${username}`);
+          const qrResponse = await fetch(`${apiUrl}/api/whatsapp/qr/${username}`);
           const qrData = await qrResponse.json();
           setQrCode(qrData.qr);
         } else {
@@ -85,14 +87,14 @@ const WhatsAppAttendanceSection: React.FC = () => {
     if (!username) return;
     setIsConnecting(true);
     setQrCode(null);
-    await fetch(`http://localhost:3001/api/whatsapp/start/${username}`, { method: 'POST' });
+    await fetch(`${apiUrl}/api/whatsapp/start/${username}`, { method: 'POST' });
     toast.info('Iniciando conexão com o WhatsApp. Aguarde o QR Code.');
     // O useEffect cuidará de atualizar o status e o QR code
   };
 
   const handleDisconnect = async () => {
     if (!username) return;
-    await fetch(`http://localhost:3001/api/whatsapp/stop/${username}`, { method: 'POST' });
+    await fetch(`${apiUrl}/api/whatsapp/stop/${username}`, { method: 'POST' });
     toast.success('Sessão do WhatsApp desconectada.');
     setConnectionStatus('disconnected');
   };
@@ -118,7 +120,7 @@ const WhatsAppAttendanceSection: React.FC = () => {
       await set(configRef, config);
 
       // 2. Enviar para o servidor Node.js (para atualizar a IA em tempo real)
-      const response = await fetch(`http://localhost:3001/api/config/update/${username}`, {
+      const response = await fetch(`${apiUrl}/api/config/update/${username}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
