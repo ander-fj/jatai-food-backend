@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from './src/hooks/useAuth';
 import { toast } from 'sonner';
 import { Save, Loader, AlertTriangle, QrCode, Wifi, WifiOff, LogOut, ChevronDown } from 'lucide-react';
 import { getDatabase, ref, get, set } from 'firebase/database';
 
+// Tipos e Interfaces
 interface WhatsAppConfig {
   isActive: boolean;
   restaurantName: string;
@@ -14,10 +15,24 @@ interface WhatsAppConfig {
   welcomeMessage: string;
 }
 
-const apiUrl = import.meta.env.VITE_API_URL || 'https://jatai-food-backend.onrender.com';
+type ConnectionStatus = 
+  | 'disconnected'
+  | 'initializing'
+  | 'QR_CODE'
+  | 'ready'
+  | 'AUTH_FAILURE'
+  | 'ERROR';
+
+const API_URL = import.meta.env.VITE_API_URL;
+
+if (!API_URL) {
+  console.error("VITE_API_URL não está definida. A comunicação com o backend falhará.");
+}
 
 const WhatsAppAttendanceSection: React.FC = () => {
   const { username } = useAuth();
+  
+  // Estados do Componente
   const [config, setConfig] = useState<WhatsAppConfig>({
     isActive: true,
     restaurantName: '',
@@ -27,29 +42,36 @@ const WhatsAppAttendanceSection: React.FC = () => {
     address: '',
     welcomeMessage: 'Olá! Eu sou o Jataí, seu assistente virtual. Como posso te ajudar hoje? 😊',
   });
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(true); // Iniciar aberto por padrão
 
+  // Efeito para buscar a configuração inicial do Firebase
   useEffect(() => {
     const fetchConfig = async () => {
       if (!username) return;
+      
       setIsLoading(true);
+      setError(null);
+      
       try {
         const db = getDatabase();
         const configRef = ref(db, `tenants/${username}/whatsappConfig`);
         const snapshot = await get(configRef);
+        
         if (snapshot.exists()) {
           setConfig(snapshot.val());
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Erro ao buscar configurações do WhatsApp:", err);
-        setError('Não foi possível carregar as configurações.');
-        toast.error('Falha ao carregar as configurações do assistente.');
+        setError('Não foi possível carregar as configurações do assistente.');
+        toast.error('Falha ao carregar as configurações.');
       } finally {
         setIsLoading(false);
       }
@@ -58,94 +80,101 @@ const WhatsAppAttendanceSection: React.FC = () => {
     fetchConfig();
   }, [username]);
 
+  // Efeito para monitorar o status da conexão com o WhatsApp
   useEffect(() => {
-    if (!username) return;
+    if (!username || !API_URL) return;
 
-    const interval = setInterval(async () => {
+    const fetchStatus = async () => {
       try {
-        const response = await fetch(`${apiUrl}/api/whatsapp/status/${username}`);
-        const data = await response.json();
-        setConnectionStatus(data.status || 'disconnected');
+        const statusResponse = await fetch(`${API_URL}/api/whatsapp/status/${username}`);
+        if (!statusResponse.ok) throw new Error('Falha ao buscar status.');
+        
+        const data = await statusResponse.json();
+        const newStatus = data.status as ConnectionStatus || 'disconnected';
+        
+        setConnectionStatus(newStatus);
 
-        if (data.status === 'QR_CODE') {
-          const qrResponse = await fetch(`${apiUrl}/api/whatsapp/qr/${username}`);
+        if (newStatus === 'QR_CODE') {
+          const qrResponse = await fetch(`${API_URL}/api/whatsapp/qr/${username}`);
+          if (!qrResponse.ok) throw new Error('Falha ao buscar QR Code.');
+          
           const qrData = await qrResponse.json();
           setQrCode(qrData.qr);
           setIsConnecting(false);
         } else {
           setQrCode(null);
-          if (data.status === 'ready') {
+          if (newStatus === 'ready' || newStatus === 'disconnected' || newStatus === 'ERROR') {
             setIsConnecting(false);
           }
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Erro ao verificar status do WhatsApp:", err);
-        setConnectionStatus('disconnected');
+        setConnectionStatus('ERROR');
         setIsConnecting(false);
       }
-    }, 3000);
+    };
+
+    fetchStatus(); // Executa imediatamente
+    const interval = setInterval(fetchStatus, 5000); // Aumentado para 5s para evitar race conditions
 
     return () => clearInterval(interval);
   }, [username]);
 
-  const handleConnect = async () => {
-    if (!username) return;
+  // Funções de Manipulação de Eventos
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setConfig((prev: WhatsAppConfig) => ({ ...prev, [name]: value }));
+  };
+
+  const handleConnect = useCallback(async () => {
+    if (!username || !API_URL) return;
+    
     setIsConnecting(true);
     setQrCode(null);
     setError(null);
+    setConnectionStatus('initializing');
     
     try {
-      const response = await fetch(`${apiUrl}/api/whatsapp/start/${username}`, { 
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      const response = await fetch(`${API_URL}/api/whatsapp/start/${username}`, { method: 'POST' });
       
-      const result = await response.json();
-      
-      if (response.ok) {
-        toast.info('Iniciando conexão com o WhatsApp. Aguarde o QR Code...');
-      } else {
-        throw new Error(result.error || 'Erro ao iniciar conexão');
+      if (!response.ok) {
+        throw new Error(`Falha na requisição: ${response.status} ${response.statusText}`);
       }
-    } catch (err: any) {
-      console.error("Erro ao conectar:", err);
-      setError(err.message || 'Erro ao iniciar conexão');
+      
+      toast.info('Iniciando conexão com o WhatsApp. Aguarde o QR Code...');
+    } catch (err: unknown) {
+      let message = 'Erro ao iniciar conexão. Verifique o console do servidor.';
+      if (err instanceof Error) {
+          message = err.message;
+      }
+      console.error("Erro ao conectar WhatsApp:", err);
+      setError(message);
       toast.error('Erro ao conectar com WhatsApp. Tente novamente.');
+      setConnectionStatus('ERROR');
       setIsConnecting(false);
     }
-  };
+  }, [username]);
 
-  const handleDisconnect = async () => {
-    if (!username) return;
+  const handleDisconnect = useCallback(async () => {
+    if (!username || !API_URL) return;
     
     try {
-      const response = await fetch(`${apiUrl}/api/whatsapp/stop/${username}`, { 
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      const result = await response.json();
+      const response = await fetch(`${API_URL}/api/whatsapp/stop/${username}`, { method: 'POST' });
       
       if (response.ok) {
         toast.success('Sessão do WhatsApp desconectada com sucesso!');
         setConnectionStatus('disconnected');
       } else {
-        throw new Error(result.error || 'Erro ao desconectar');
+        throw new Error(`Falha na requisição: ${response.status} ${response.statusText}`);
       }
-    } catch (err: any) {
-      console.error("Erro ao desconectar:", err);
+    } catch (err: unknown) {
+      console.error("Erro ao desconectar WhatsApp:", err);
       toast.error('Erro ao desconectar. Tente novamente.');
+      if (err instanceof Error) {
+          setError(err.message);
+      }
     }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setConfig(prev => ({ ...prev, [name]: value }));
-  };
+  }, [username]);
 
   const handleSaveConfig = async () => {
     if (!username) {
@@ -157,42 +186,43 @@ const WhatsAppAttendanceSection: React.FC = () => {
     setError(null);
 
     try {
-      // 1. Salvar no Firebase (persistência)
+      // 1. Salvar no Firebase
       const db = getDatabase();
       const configRef = ref(db, `tenants/${username}/whatsappConfig`);
       await set(configRef, config);
 
-      // 2. Enviar para o servidor Node.js (para atualizar a IA em tempo real)
-      const response = await fetch(`${apiUrl}/api/config/update/${username}`, {
+      // 2. Enviar para o servidor Node.js para atualização em tempo real
+      const response = await fetch(`${API_URL}/api/config/update/${username}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Falha ao atualizar o servidor do assistente.');
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Falha ao atualizar o servidor do assistente.');
+        } catch (jsonError) {
+          throw new Error(`Servidor respondeu com ${response.status}.`);
+        }
       }
 
-      const result = await response.json();
+      toast.success('✅ Configurações salvas e aplicadas com sucesso!');
 
-      if (result.success) {
-        toast.success('✅ Configurações salvas com sucesso!');
-      } else {
-        throw new Error(result.error || 'Ocorreu um erro no servidor.');
+    } catch (err: unknown) {
+      let message = 'Não foi possível salvar as configurações.';
+      if (err instanceof Error) {
+          message = err.message;
       }
-
-    } catch (err: any) {
       console.error("Erro ao salvar configurações:", err);
-      setError(err.message || 'Não foi possível salvar as configurações.');
-      toast.error(`Erro ao salvar: ${err.message}`);
+      setError(message);
+      toast.error(`Erro ao salvar: ${message}`);
     } finally {
       setIsSaving(false);
     }
   };
 
+  // Renderização do componente
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -201,6 +231,27 @@ const WhatsAppAttendanceSection: React.FC = () => {
       </div>
     );
   }
+
+  const isConnectButtonDisabled = isConnecting || connectionStatus === 'initializing' || connectionStatus === 'QR_CODE';
+
+  const renderConnectionStatus = () => {
+    switch (connectionStatus) {
+      case 'ready':
+        return { icon: <Wifi className="h-6 w-6 text-green-500 mr-2" />, text: '✅ Conectado', color: 'text-green-600', subtext: 'WhatsApp conectado e funcionando' };
+      case 'QR_CODE':
+        return { icon: <QrCode className="h-6 w-6 text-yellow-500 mr-2" />, text: '⏳ Aguardando leitura do QR Code', color: 'text-yellow-600' };
+      case 'initializing':
+        return { icon: <Loader className="animate-spin h-6 w-6 text-blue-500 mr-2" />, text: '🔄 Iniciando...', color: 'text-blue-600' };
+      case 'AUTH_FAILURE':
+        return { icon: <AlertTriangle className="h-6 w-6 text-red-500 mr-2" />, text: '❌ Falha na autenticação', color: 'text-red-600' };
+      case 'ERROR':
+        return { icon: <WifiOff className="h-6 w-6 text-red-500 mr-2" />, text: '⚠️ Erro na conexão', color: 'text-red-600' };
+      default:
+        return { icon: <WifiOff className="h-6 w-6 text-gray-500 mr-2" />, text: '⚫ Desconectado', color: 'text-gray-600' };
+    }
+  };
+  
+  const { icon, text, color, subtext } = renderConnectionStatus();
 
   return (
     <div className="p-6 bg-white rounded-lg shadow-sm max-w-4xl mx-auto">
@@ -215,47 +266,23 @@ const WhatsAppAttendanceSection: React.FC = () => {
         <h3 className="text-lg font-bold text-gray-800 mb-3">Status da Conexão</h3>
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            {connectionStatus === 'ready' ? (
-              <Wifi className="h-6 w-6 text-green-500 mr-2" />
-            ) : (
-              <WifiOff className="h-6 w-6 text-red-500 mr-2" />
-            )}
+            {icon}
             <div className="flex flex-col">
-              <span className={`font-semibold ${connectionStatus === 'ready' ? 'text-green-600' : 'text-red-600'}`}>
-                {connectionStatus === 'ready' ? '✅ Conectado' : 
-                 connectionStatus === 'QR_CODE' ? '⏳ Aguardando leitura do QR Code' :
-                 connectionStatus === 'INITIALIZING' ? '🔄 Iniciando...' :
-                 connectionStatus === 'AUTH_FAILURE' ? '❌ Falha na autenticação' :
-                 connectionStatus === 'ERROR' ? '⚠️ Erro na conexão' :
-                 '⚫ Desconectado'}
-              </span>
-              {connectionStatus === 'ready' && (
-                <span className="text-xs text-gray-500 mt-1">WhatsApp conectado e funcionando</span>
-              )}
+              <span className={`font-semibold ${color}`}>{text}</span>
+              {subtext && <span className="text-xs text-gray-500 mt-1">{subtext}</span>}
             </div>
           </div>
           
-          {connectionStatus !== 'ready' && (
+          {connectionStatus !== 'ready' ? (
             <button
               onClick={handleConnect}
-              disabled={isConnecting || connectionStatus === 'INITIALIZING' || connectionStatus === 'QR_CODE'}
+              disabled={isConnectButtonDisabled}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
-              {isConnecting ? (
-                <>
-                  <Loader className="animate-spin mr-2 h-5 w-5" />
-                  Conectando...
-                </>
-              ) : (
-                <>
-                  <QrCode className="mr-2 h-5 w-5" />
-                  Conectar WhatsApp
-                </>
-              )}
+              {isConnecting || connectionStatus === 'initializing' ? <Loader className="animate-spin mr-2 h-5 w-5" /> : <QrCode className="mr-2 h-5 w-5" />}
+              {isConnecting || connectionStatus === 'initializing' ? 'Conectando...' : 'Conectar WhatsApp'}
             </button>
-          )}
-          
-          {connectionStatus === 'ready' && (
+          ) : (
             <button
               onClick={handleDisconnect}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
@@ -266,7 +293,6 @@ const WhatsAppAttendanceSection: React.FC = () => {
           )}
         </div>
 
-        {/* QR CODE */}
         {connectionStatus === 'QR_CODE' && qrCode && (
           <div className="mt-4 p-4 bg-white rounded-md shadow-inner flex flex-col items-center animate-fade-in">
             <h4 className="text-md font-semibold text-gray-700 mb-2">📱 Escaneie para conectar</h4>
@@ -277,11 +303,12 @@ const WhatsAppAttendanceSection: React.FC = () => {
           </div>
         )}
 
-        {/* MENSAGEM DE ERRO */}
-        {connectionStatus === 'AUTH_FAILURE' && (
+        {(connectionStatus === 'AUTH_FAILURE' || connectionStatus === 'ERROR') && (
           <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 rounded">
             <p className="text-sm text-red-700">
-              ❌ Falha na autenticação. Tente conectar novamente.
+              {connectionStatus === 'AUTH_FAILURE' 
+                ? '❌ Falha na autenticação. Tente conectar novamente.'
+                : '⚠️ Ocorreu um erro na conexão. Verifique o console do servidor ou tente reconectar.'}
             </p>
           </div>
         )}
@@ -312,20 +339,20 @@ const WhatsAppAttendanceSection: React.FC = () => {
         </button>
 
         {isConfigOpen && (
-          <div className="p-6 space-y-6 border-t border-gray-200">
+          <div className="p-6 space-y-6 border-t border-gray-200 animate-fade-in">
             {/* ATIVAR/DESATIVAR ASSISTENTE */}
             <div>
               <label className="flex items-center justify-between cursor-pointer">
                 <span className="flex flex-col">
                   <span className="text-lg font-semibold text-gray-800">Ativar Assistente Virtual</span>
-                  <span className="text-sm text-gray-500">Se desativado, o robô não responderá a nenhuma mensagem no WhatsApp.</span>
+                  <span className="text-sm text-gray-500">Se desativado, o robô não responderá a nenhuma mensagem.</span>
                 </span>
                 <span className="relative">
                   <input
                     type="checkbox"
                     className="sr-only"
                     checked={config.isActive}
-                    onChange={() => setConfig(prev => ({ ...prev, isActive: !prev.isActive }))}
+                    onChange={() => setConfig((prev: WhatsAppConfig) => ({ ...prev, isActive: !prev.isActive }))}
                   />
                   <span className={`block w-14 h-8 rounded-full transition ${config.isActive ? 'bg-indigo-600' : 'bg-gray-300'}`}></span>
                   <span className={`absolute left-1 top-1 block w-6 h-6 rounded-full bg-white transform transition-transform ${config.isActive ? 'translate-x-6' : ''}`}></span>
@@ -337,79 +364,32 @@ const WhatsAppAttendanceSection: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="restaurantName" className="block text-sm font-medium text-gray-700 mb-1">Nome do Restaurante</label>
-                <input 
-                  type="text" 
-                  name="restaurantName" 
-                  id="restaurantName" 
-                  value={config.restaurantName} 
-                  onChange={handleInputChange} 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                  placeholder="Ex: Pizzaria do Jataí"
-                />
+                <input type="text" name="restaurantName" id="restaurantName" value={config.restaurantName} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: Pizzaria do Jataí" />
               </div>
               <div>
                 <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">Telefone de Contato</label>
-                <input 
-                  type="text" 
-                  name="phoneNumber" 
-                  id="phoneNumber" 
-                  value={config.phoneNumber} 
-                  onChange={handleInputChange} 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                  placeholder="Ex: (11) 99999-9999"
-                />
+                <input type="text" name="phoneNumber" id="phoneNumber" value={config.phoneNumber} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: (11) 99999-9999" />
               </div>
             </div>
 
             <div>
               <label htmlFor="menuUrl" className="block text-sm font-medium text-gray-700 mb-1">Link do Cardápio</label>
-              <input 
-                type="url" 
-                name="menuUrl" 
-                id="menuUrl" 
-                value={config.menuUrl} 
-                onChange={handleInputChange} 
-                placeholder="https://seu-cardapio.com" 
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-              />
+              <input type="url" name="menuUrl" id="menuUrl" value={config.menuUrl} onChange={handleInputChange} placeholder="https://seu-cardapio.com" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
             </div>
 
             <div>
               <label htmlFor="hours" className="block text-sm font-medium text-gray-700 mb-1">Horário de Funcionamento</label>
-              <input 
-                type="text" 
-                name="hours" 
-                id="hours" 
-                value={config.hours} 
-                onChange={handleInputChange} 
-                placeholder="Ex: Terça a Domingo, das 18h às 23h" 
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-              />
+              <input type="text" name="hours" id="hours" value={config.hours} onChange={handleInputChange} placeholder="Ex: Terça a Domingo, das 18h às 23h" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
             </div>
 
             <div>
               <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
-              <input 
-                type="text" 
-                name="address" 
-                id="address" 
-                value={config.address} 
-                onChange={handleInputChange} 
-                placeholder="Rua, Número, Bairro, Cidade-UF" 
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-              />
+              <input type="text" name="address" id="address" value={config.address} onChange={handleInputChange} placeholder="Rua, Número, Bairro, Cidade-UF" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
             </div>
 
             <div>
               <label htmlFor="welcomeMessage" className="block text-sm font-medium text-gray-700 mb-1">Mensagem de Boas-vindas</label>
-              <textarea
-                name="welcomeMessage"
-                id="welcomeMessage"
-                rows={4}
-                value={config.welcomeMessage}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              />
+              <textarea name="welcomeMessage" id="welcomeMessage" rows={4} value={config.welcomeMessage} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
               <p className="mt-2 text-xs text-gray-500">Esta é a primeira mensagem que o assistente enviará. Use emojis para deixar mais amigável! 🚀</p>
             </div>
 

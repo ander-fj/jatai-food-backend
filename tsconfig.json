@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowJs": true, // Permite a compilação de arquivos JavaScript.
+    "outDir": "./dist",
+    "jsx": "react-jsx", // Adicionado para suportar JSX
+    "lib": ["dom", "dom.iterable", "esnext"], // Adicionado 'dom' e 'dom.iterable' para tipos do navegador
+    "allowSyntheticDefaultImports": true, // Recomendado para interoperabilidade de módulos
+    "noEmit": true, // Adicionado para evitar a emissão de arquivos JS, já que um bundler (como Vite/Next.js) deve fazer isso
+    "isolatedModules": true // Garante que cada arquivo seja um módulo separado
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.js",
+    "WhatsAppAttendanceSection.tsx" // Incluindo o arquivo na compilação
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

@@ -1,3 +1,4 @@
+// --- IMPORTS ---
 const express = require('express');
 const cors = require('cors');
 const { Client, LocalAuth } = require('whatsapp-web.js');
@@ -8,6 +9,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
 const { getDatabase, ref, get, set, remove } = require('firebase/database');
 
+// --- VALIDAÇÃO DE VARIÁVEIS DE AMBIENTE ---
 const requiredEnvVars = [
   'GEMINI_API_KEY',
   'FIREBASE_API_KEY',
@@ -22,9 +24,9 @@ const requiredEnvVars = [
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-  console.error('\n[ERRO CRÍTICO] As seguintes variáveis de ambiente essenciais não foram encontradas:');
+  console.error('[ERRO CRÍTICO] Variáveis de ambiente essenciais não encontradas:');
   missingEnvVars.forEach(v => console.error(`- ${v}`));
-  console.error('\nPor favor, configure-as no seu ambiente de produção (ex: Render Environment Variables) ou no arquivo .env para desenvolvimento local.\n');
+  console.error('\nConfigure-as no seu ambiente ou no arquivo .env.\n');
   process.exit(1);
 }
 
@@ -38,56 +40,189 @@ const firebaseConfig = {
   messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.FIREBASE_APP_ID,
 };
-
-// Inicializa o Firebase
 const firebaseApp = initializeApp(firebaseConfig);
 const database = getDatabase(firebaseApp);
 
+// --- CONFIGURAÇÃO DO EXPRESS ---
 const app = express();
 const port = process.env.PORT || 3001;
 
-// --- CONFIGURAÇÃO DO CORS ---
 const allowedOrigins = [
   'https://www.jataifood.com.br',
   'https://jatai-food-backend.onrender.com',
-  'http://localhost:5173',
+  'http://localhost:5173', // Para desenvolvimento local
 ];
-
-app.use(cors({
-  origin: allowedOrigins
-}));
-
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
-// Armazena as sessões dos clientes
-const sessions = {};
-const sessionChatMappings = {};
-let chatSessions = {};
+// --- ARMAZENAMENTO DE SESSÕES (ATENÇÃO: EM MEMÓRIA) ---
+// TODO: Migrar para uma solução de armazenamento persistente (ex: Redis) para produção.
+// O armazenamento em memória será perdido em reinicializações do servidor.
+const sessions = {}; // Armazena instâncias de cliente do WhatsApp
+const chatContexts = {}; // Armazena contextos de chat da IA
 
-app.get('/', (req, res) => {
-  res.send('Olá! Este é o servidor para o bot do WhatsApp.');
-});
+// --- FUNÇÕES AUXILIARES ---
 
-// Rota de Health Check para o Render
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
+/**
+ * Gera a instrução de sistema para o modelo de IA com base nos dados do restaurante.
+ * @param {object} config - Objeto de configuração do WhatsApp.
+ * @returns {string} - A instrução de sistema formatada.
+ */
+const createSystemInstruction = (config) => `
+  Você é o assistente virtual do restaurante ${config.restaurantName || 'do nosso restaurante'}! Seu nome é Jataí.
+  Sua personalidade é super divertida, animada e simpática! Use emojis para deixar a conversa mais legal. 🥳🍕✨
+  Sua mensagem de boas-vindas é: "${config.welcomeMessage || 'Olá! Como posso te ajudar?'}"
+  Sua missão é ajudar os clientes com um sorriso no rosto (virtual, claro!). Use as informações abaixo para responder:
+  - Horário de funcionamento: ${config.hours || 'Não informado'}
+  - Endereço (se perguntarem onde fica): ${config.address || 'Não informado'}
+  - Link do Cardápio e Pedidos: ${config.menuUrl || 'Não informado'}
+  - Telefone de contato: ${config.phoneNumber || 'Não informado'}
+  IMPORTANTE: Ao enviar o link do cardápio, envie apenas a URL, sem formatação de link ou markdown. Por exemplo: https://seusite.com/cardapio
+  NUNCA invente informações. Se não souber algo, diga algo como: "Opa, essa pergunta me pegou! Vou chamar um humano pra te ajudar, só um minutinho! 🧑‍🍳"
+`;
 
-// Rota para verificar o status da conexão
+/**
+ * Inicializa e gerencia uma sessão do WhatsApp.
+ * @param {string} id - O ID do tenant (usuário).
+ */
+const initializeWhatsAppClient = async (id) => {
+  if (sessions[id] && sessions[id].client) {
+    console.log(`[Sessão ${id}] Tentativa de iniciar, mas já existe uma instância.`);
+    return;
+  }
+
+  const statusRef = ref(database, `tenants/${id}/session/status`);
+  const qrRef = ref(database, `tenants/${id}/session/qr`);
+
+  console.log(`[Sessão ${id}] Configurando cliente...`);
+  
+  // ATENÇÃO: LocalAuth não é ideal para ambientes sem estado/efêmeros.
+  // Para produção em escala, considere usar uma AuthStrategy customizada com Redis/S3.
+  const client = new Client({
+    authStrategy: new LocalAuth({ clientId: id }),
+    puppeteer: {
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      headless: true,
+    },
+    webVersionCache: {
+      type: 'remote',
+      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+    }
+  });
+
+  sessions[id] = { client, status: 'INITIALIZING' };
+
+  client.on('qr', async (qr) => {
+    console.log(`[Sessão ${id}] QR Code gerado.`);
+    qrcodeTerminal.generate(qr, { small: true });
+    await set(statusRef, 'QR_CODE');
+    const qrUrl = await qrcode.toDataURL(qr);
+    await set(qrRef, qrUrl);
+    sessions[id].status = 'QR_CODE';
+  });
+
+  client.on('ready', async () => {
+    console.log(`[Sessão ${id}] Cliente conectado e pronto!`);
+    await set(statusRef, 'ready');
+    await remove(qrRef);
+    sessions[id].status = 'ready';
+  });
+
+  client.on('message', async (message) => {
+    if (message.fromMe) return;
+
+    console.log(`[Sessão ${id}] Mensagem de ${message.from}: "${message.body}"`);
+    const chatId = message.from;
+
+    try {
+      const configRef = ref(database, `tenants/${id}/whatsappConfig`);
+      const snapshot = await get(configRef);
+      const config = snapshot.exists() ? snapshot.val() : {};
+
+      if (!config.isActive) {
+        console.log(`[Sessão ${id}] Assistente desativado. Ignorando.`);
+        return;
+      }
+
+      if (!chatContexts[chatId]) {
+        console.log(`[Sessão ${id}] Iniciando novo contexto de chat para ${chatId}`);
+        const systemInstruction = createSystemInstruction(config);
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-1.5-flash";
+        const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
+        chatContexts[chatId] = model.startChat({ history: [] });
+      }
+
+      const chat = chatContexts[chatId];
+      const result = await chat.sendMessage(message.body);
+      const response = await result.response;
+      const text = response.text();
+      await message.reply(text);
+
+    } catch (e) {
+      console.error(`[Sessão ${id}] Erro ao processar mensagem com IA:`, e);
+      await message.reply('Desculpe, não consegui processar sua solicitação no momento. 😔');
+    }
+  });
+
+  client.on('disconnected', async (reason) => {
+    console.log(`[Sessão ${id}] Cliente desconectado. Razão:`, reason);
+    await remove(ref(database, `tenants/${id}/session`));
+    
+    // Limpa contextos de chat associados a esta sessão
+    Object.keys(chatContexts).forEach(chatId => {
+        // Esta é uma heurística. Um mapeamento explícito tenant -> chats seria mais robusto.
+        if (sessions[id]) { 
+          delete chatContexts[chatId];
+        }
+    });
+
+    if (sessions[id]) {
+      try {
+        await sessions[id].client.destroy();
+      } catch (e) {
+        console.error(`[Sessão ${id}] Erro ao destruir cliente:`, e);
+      }
+      delete sessions[id];
+    }
+  });
+  
+  client.on('auth_failure', async (msg) => {
+    console.error(`[Sessão ${id}] Falha na autenticação:`, msg);
+    await set(statusRef, 'AUTH_FAILURE');
+    sessions[id].status = 'AUTH_FAILURE';
+  });
+
+  try {
+    console.log(`[Sessão ${id}] Inicializando cliente...`);
+    await client.initialize();
+  } catch (error) {
+    console.error(`[Sessão ${id}] Erro crítico na inicialização:`, error);
+    await set(statusRef, 'ERROR');
+    if (sessions[id]) delete sessions[id];
+  }
+};
+
+// --- ROTAS DA API ---
+
+// TODO: Implementar um middleware de autenticação para proteger estas rotas.
+// Atualmente, qualquer pessoa com o ID do tenant pode controlar a sessão.
+
+app.get('/health', (req, res) => res.status(200).send('OK'));
+
 app.get('/api/whatsapp/status/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const statusRef = ref(database, `tenants/${id}/session/status`);
     const snapshot = await get(statusRef);
     const status = snapshot.exists() ? snapshot.val() : 'disconnected';
-    res.json({ status: status, message: `Sessão ${id} está ${status}.` });
+    res.json({ status });
   } catch (error) {
-    console.error('Erro ao buscar status:', error);
+    console.error(`[Status ${id}] Erro:`, error);
     res.status(500).json({ status: 'disconnected', message: 'Erro ao buscar status.' });
   }
 });
 
-// Rota para obter o QR code
 app.get('/api/whatsapp/qr/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -96,269 +231,71 @@ app.get('/api/whatsapp/qr/:id', async (req, res) => {
     if (snapshot.exists()) {
       res.json({ qr: snapshot.val() });
     } else {
-      res.status(404).json({ error: 'QR code não encontrado.' });
+      res.status(404).json({ error: 'QR code não encontrado ou já utilizado.' });
     }
   } catch (error) {
-    console.error('Erro ao buscar QR code:', error);
+    console.error(`[QR ${id}] Erro:`, error);
     res.status(500).json({ error: 'Erro ao buscar QR code.' });
   }
 });
 
-// Função para inicializar o cliente do WhatsApp
-const initializeWhatsAppClient = async (id) => {
-  const { id } = req.params;
-
-  if (sessions[id] && (await sessions[id].getState()) === 'CONNECTED') {
-    const statusRef = ref(database, `tenants/${id}/session/status`);
-    const snapshot = await get(statusRef);
-    if (snapshot.exists() && snapshot.val() === 'ready') {
-      return res.status(200).json({ success: true, message: `Sessão ${id} já está conectada.` });
-    }
-  }
-
-  const statusRef = ref(database, `tenants/${id}/session/status`);
-  const qrRef = ref(database, `tenants/${id}/session/qr`);
-
-  try {
-    console.log(`[Sessão ${id}] Configurando cliente...`);
-    const client = new Client({
-      authStrategy: new LocalAuth({
-        clientId: id,
-      }),
-      puppeteer: {
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ],
-        headless: true,
-      },
-      webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-      }
-    });
-
-    client.on('loading_screen', (percent, message) => {
-      console.log(`[Sessão ${id}] Carregando: ${percent}% - ${message}`);
-    });
-
-    client.on('authenticated', () => {
-      console.log(`[Sessão ${id}] Autenticada com sucesso!`);
-    });
-
-    client.on('auth_failure', async (msg) => {
-      console.error(`[Sessão ${id}] Falha na autenticação:`, msg);
-      await set(statusRef, 'AUTH_FAILURE');
-      await remove(qrRef);
-    });
-
-    client.on('qr', async (qr) => {
-      console.log(`[Sessão ${id}] QR Code gerado`);
-      qrcodeTerminal.generate(qr, { small: true });
-      await set(statusRef, 'QR_CODE');
-      qrcode.toDataURL(qr, async (err, url) => {
-        if (!err) {
-          await set(qrRef, url);
-        }
-      });
-    });
-
-    client.on('ready', async () => {
-      console.log(`[Sessão ${id}] Conectada e pronta!`);
-      await set(statusRef, 'ready');
-      await remove(qrRef);
-    });
-
-    if (!sessionChatMappings[id]) {
-      sessionChatMappings[id] = new Set();
-    }
-
-    client.on('message', async (message) => {
-      if (message.fromMe) {
-        return;
-      }
-
-      console.log(`[Sessão ${id}] Mensagem de ${message.from}: "${message.body}"`);
-
-      try {
-        const chatId = message.from;
-        sessionChatMappings[id].add(chatId);
-
-        let restaurantData = {};
-        try {
-          const configRef = ref(database, `tenants/${id}/whatsappConfig`);
-          const snapshot = await get(configRef);
-          if (snapshot.exists()) {
-            restaurantData = snapshot.val();
-          }
-        } catch (dbError) {
-          console.error(`[Sessão ${id}] Erro ao buscar configuração:`, dbError);
-        }
-
-        if (!restaurantData.isActive) {
-          console.log(`[Sessão ${id}] Assistente desativado. Ignorando mensagem.`);
-          return;
-        }
-
-        if (!chatSessions[chatId]) {
-          console.log(`[Sessão ${id}] Iniciando nova sessão de chat para ${chatId}`);
-
-          const systemInstruction = `
-            Você é o assistente virtual do restaurante ${restaurantData.restaurantName || 'do nosso restaurante'}! Seu nome é Jataí.
-            Sua personalidade é super divertida, animada e simpática! Use emojis para deixar a conversa mais legal. 🥳🍕✨
-            Sua mensagem de boas-vindas é: "${restaurantData.welcomeMessage || 'Olá! Como posso te ajudar?'}"
-            Sua missão é ajudar os clientes com um sorriso no rosto (virtual, claro!). Use as informações abaixo para responder:
-            - Horário de funcionamento: ${restaurantData.hours || 'Não informado'}
-            - Endereço (se perguntarem onde fica): ${restaurantData.address || 'Não informado'}
-            - Link do Cardápio e Pedidos: ${restaurantData.menuUrl || 'Não informado'}
-            - Telefone de contato: ${restaurantData.phoneNumber || 'Não informado'}
-            IMPORTANTE: Ao enviar o link do cardápio, envie apenas a URL, sem formatação de link ou markdown. Por exemplo: https://seusite.com/cardapio
-            NUNCA invente informações. Se não souber algo, diga algo como: "Opa, essa pergunta me pegou! Vou chamar um humano pra te ajudar, só um minutinho! 🧑‍🍳"
-          `;
-
-          const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-          const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash";
-          const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
-          chatSessions[chatId] = model.startChat({
-            history: [],
-          });
-        }
-
-        const chat = chatSessions[chatId];
-        const result = await chat.sendMessage(message.body);
-        const response = await result.response;
-        const text = response.text();
-        await message.reply(text);
-      } catch (e) {
-        console.error(`[Sessão ${id}] Erro ao gerar resposta da IA:`, e);
-        await message.reply('Desculpe, não consegui processar sua solicitação no momento. 😔');
-      }
-    });
-
-    client.on('disconnected', async (reason) => {
-      console.log(`[Sessão ${id}] Desconectada. Razão:`, reason);
-      const sessionRef = ref(database, `tenants/${id}/session`);
-      await remove(sessionRef);
-
-      Object.keys(chatSessions).forEach(key => {
-        if (sessionChatMappings[id]?.has(key)) {
-          console.log(`[Sessão ${id}] Limpando sessão de chat para ${key}`);
-          delete chatSessions[key];
-        }
-      });
-
-      if (sessionChatMappings[id]) {
-        delete sessionChatMappings[id];
-      }
-
-      await client.destroy();
-      delete sessions[id];
-    });
-
-    console.log(`[Sessão ${id}] Iniciando cliente...`);
-    await client.initialize();
-    sessions[id] = client;
-    console.log(`[Sessão ${id}] Cliente inicializado.`);
-
-  } catch (error) {
-    console.error(`[Sessão ${id}] Erro ao inicializar:`, error);
-    await set(statusRef, 'ERROR');
-  }
-};
-
-// Rota para iniciar a conexão do WhatsApp
 app.post('/api/whatsapp/start/:id', async (req, res) => {
   const { id } = req.params;
   console.log(`[Sessão ${id}] Recebida requisição para iniciar.`);
   await set(ref(database, `tenants/${id}/session/status`), 'INITIALIZING');
-  initializeWhatsAppClient(id); // Inicia o processo em segundo plano
-  res.status(202).json({ success: true, message: `Inicialização da sessão ${id} iniciada. Verifique o status para obter o QR code.` });
-  }
+  initializeWhatsAppClient(id).catch(err => {
+    console.error(`[Sessão ${id}] Falha não capturada na inicialização:`, err);
+  });
+  res.status(202).json({ success: true, message: `Inicialização da sessão ${id} iniciada.` });
 });
 
-// Rota para parar a conexão do WhatsApp
 app.post('/api/whatsapp/stop/:id', async (req, res) => {
   const { id } = req.params;
-  const client = sessions[id];
+  const session = sessions[id];
 
-  if (client) {
-    console.log(`[Sessão ${id}] Desconectando...`);
+  if (session && session.client) {
+    console.log(`[Sessão ${id}] Recebida requisição para parar.`);
     try {
-      await client.logout();
+      await session.client.logout(); // O evento 'disconnected' cuidará da limpeza.
       res.status(200).json({ success: true, message: `Sessão ${id} desconectada.` });
     } catch (error) {
-      console.error(`[Sessão ${id}] Erro ao desconectar:`, error);
+      console.error(`[Sessão ${id}] Erro ao fazer logout:`, error);
       res.status(500).json({ success: false, error: 'Erro ao desconectar.' });
     }
   } else {
-    const statusRef = ref(database, `tenants/${id}/session/status`);
-    await set(statusRef, 'disconnected');
-    res.status(404).json({ success: false, error: `Sessão ${id} não encontrada.` });
+    await set(ref(database, `tenants/${id}/session/status`), 'disconnected');
+    res.status(404).json({ success: false, error: `Sessão ${id} não encontrada ou já inativa.` });
   }
 });
 
-// Rota para enviar mensagem
-app.post('/api/whatsapp/send-message/:id', async (req, res) => {
-  const { id } = req.params;
-  const { number, message } = req.body;
-
-  if (!number || !message) {
-    return res.status(400).json({ success: false, error: 'Número e mensagem são obrigatórios.' });
-  }
-
-  const client = sessions[id];
-
-  const statusRef = ref(database, `tenants/${id}/session/status`);
-  const snapshot = await get(statusRef);
-
-  if (!client || !snapshot.exists() || snapshot.val() !== 'ready') {
-    return res.status(404).json({ success: false, error: `Sessão ${id} não está conectada ou não foi encontrada.` });
-  }
-
-  try {
-    const chatId = `${number}@c.us`;
-    await client.sendMessage(chatId, message);
-    console.log(`[Sessão ${id}] Mensagem enviada para ${number}`);
-    res.status(200).json({ success: true, message: `Mensagem enviada para ${number}` });
-  } catch (error) {
-    console.error(`[Sessão ${id}] Erro ao enviar mensagem:`, error);
-    res.status(500).json({ success: false, error: 'Erro ao enviar mensagem.', details: error.message });
-  }
-});
-
-// Rota para atualizar a configuração do restaurante
 app.post('/api/config/update/:id', async (req, res) => {
   const { id } = req.params;
-  const newData = req.body;
+  const newConfig = req.body;
 
-  if (!newData || Object.keys(newData).length === 0) {
-    return res.status(400).json({ success: false, error: 'Nenhum dado fornecido para atualização.' });
+  if (!newConfig || Object.keys(newConfig).length === 0) {
+    return res.status(400).json({ success: false, error: 'Nenhum dado fornecido.' });
   }
   
   try {
     const configRef = ref(database, `tenants/${id}/whatsappConfig`);
-    await set(configRef, newData);
+    await set(configRef, newConfig);
 
-    if (sessionChatMappings[id]) {
-      sessionChatMappings[id].forEach(chatId => {
-        if (chatSessions[chatId]) {
-          delete chatSessions[chatId];
-        }
-      });
-    }
-    console.log(`[Sessão ${id}] Configurações atualizadas com sucesso no Firebase!`);
-    res.status(200).json({ success: true, message: 'Configurações atualizadas e sessões de IA reiniciadas.' });
+    // Invalida todos os contextos de chat para este tenant, forçando a recriação com a nova config.
+    Object.keys(chatContexts).forEach(chatId => {
+        // Esta é uma heurística. Um mapeamento explícito tenant -> chats seria mais robusto.
+        delete chatContexts[chatId];
+    });
+
+    console.log(`[Sessão ${id}] Configurações atualizadas e contextos de IA reiniciados.`);
+    res.status(200).json({ success: true, message: 'Configurações atualizadas.' });
   } catch (error) {
-    console.error(`[Sessão ${id}] Erro ao salvar configuração:`, error);
-    res.status(500).json({ success: false, error: 'Erro ao salvar a configuração no servidor.' });
+    console.error(`[Config ${id}] Erro ao salvar:`, error);
+    res.status(500).json({ success: false, error: 'Erro ao salvar a configuração.' });
   }
 });
 
+// --- INICIALIZAÇÃO DO SERVIDOR ---
 app.listen(port, () => {
   console.log(`Servidor rodando em http://localhost:${port}`);
+  console.log('Aguardando requisições para iniciar sessões do WhatsApp...');
 });
