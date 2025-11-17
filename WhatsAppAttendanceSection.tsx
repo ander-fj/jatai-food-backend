@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { Save, Loader, AlertTriangle, QrCode, Wifi, WifiOff, LogOut, ChevronDown } from 'lucide-react';
 import { getDatabase, ref, get, set } from 'firebase/database';
 
-// Tipos e Interfaces
 interface WhatsAppConfig {
   isActive: boolean;
   restaurantName: string;
@@ -32,7 +31,6 @@ if (!API_URL) {
 const WhatsAppAttendanceSection: React.FC = () => {
   const { username } = useAuth();
   
-  // Estados do Componente
   const [config, setConfig] = useState<WhatsAppConfig>({
     isActive: true,
     restaurantName: '',
@@ -50,9 +48,9 @@ const WhatsAppAttendanceSection: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isConfigOpen, setIsConfigOpen] = useState(true); // Iniciar aberto por padrão
+  const [isConfigOpen, setIsConfigOpen] = useState(true);
 
-  // Efeito para buscar a configuração inicial do Firebase
+  // Buscar configuração inicial do Firebase
   useEffect(() => {
     const fetchConfig = async () => {
       if (!username) return;
@@ -80,26 +78,35 @@ const WhatsAppAttendanceSection: React.FC = () => {
     fetchConfig();
   }, [username]);
 
-  // Efeito para monitorar o status da conexão com o WhatsApp
+  // Monitorar status da conexão com o WhatsApp
   useEffect(() => {
     if (!username || !API_URL) return;
 
     const fetchStatus = async () => {
       try {
+        // Buscar status
         const statusResponse = await fetch(`${API_URL}/api/whatsapp/status/${username}`);
-        if (!statusResponse.ok) throw new Error('Falha ao buscar status.');
+        if (!statusResponse.ok) {
+          console.warn('Falha ao buscar status:', statusResponse.status);
+          return;
+        }
         
         const data = await statusResponse.json();
         const newStatus = data.status as ConnectionStatus || 'disconnected';
         
         setConnectionStatus(newStatus);
 
+        // Buscar QR code apenas se o status for QR_CODE
         if (newStatus === 'QR_CODE') {
           const qrResponse = await fetch(`${API_URL}/api/whatsapp/qr/${username}`);
-          if (!qrResponse.ok) throw new Error('Falha ao buscar QR Code.');
-          
-          const qrData = await qrResponse.json();
-          setQrCode(qrData.qr);
+          if (qrResponse.ok) {
+            const qrData = await qrResponse.json();
+            if (qrData.qr) {
+              setQrCode(qrData.qr);
+            } else {
+              console.log('QR code ainda não disponível');
+            }
+          }
           setIsConnecting(false);
         } else {
           setQrCode(null);
@@ -109,18 +116,16 @@ const WhatsAppAttendanceSection: React.FC = () => {
         }
       } catch (err: unknown) {
         console.error("Erro ao verificar status do WhatsApp:", err);
-        setConnectionStatus('ERROR');
-        setIsConnecting(false);
+        // Não alterar o status em caso de erro de rede para evitar flickering
       }
     };
 
-    fetchStatus(); // Executa imediatamente
-    const interval = setInterval(fetchStatus, 5000); // Aumentado para 5s para evitar race conditions
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
 
     return () => clearInterval(interval);
   }, [username]);
 
-  // Funções de Manipulação de Eventos
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setConfig((prev: WhatsAppConfig) => ({ ...prev, [name]: value }));
@@ -145,7 +150,7 @@ const WhatsAppAttendanceSection: React.FC = () => {
     } catch (err: unknown) {
       let message = 'Erro ao iniciar conexão. Verifique o console do servidor.';
       if (err instanceof Error) {
-          message = err.message;
+        message = err.message;
       }
       console.error("Erro ao conectar WhatsApp:", err);
       setError(message);
@@ -171,7 +176,7 @@ const WhatsAppAttendanceSection: React.FC = () => {
       console.error("Erro ao desconectar WhatsApp:", err);
       toast.error('Erro ao desconectar. Tente novamente.');
       if (err instanceof Error) {
-          setError(err.message);
+        setError(err.message);
       }
     }
   }, [username]);
@@ -186,12 +191,10 @@ const WhatsAppAttendanceSection: React.FC = () => {
     setError(null);
 
     try {
-      // 1. Salvar no Firebase
       const db = getDatabase();
       const configRef = ref(db, `tenants/${username}/whatsappConfig`);
       await set(configRef, config);
 
-      // 2. Enviar para o servidor Node.js para atualização em tempo real
       const response = await fetch(`${API_URL}/api/config/update/${username}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -212,7 +215,7 @@ const WhatsAppAttendanceSection: React.FC = () => {
     } catch (err: unknown) {
       let message = 'Não foi possível salvar as configurações.';
       if (err instanceof Error) {
-          message = err.message;
+        message = err.message;
       }
       console.error("Erro ao salvar configurações:", err);
       setError(message);
@@ -222,7 +225,6 @@ const WhatsAppAttendanceSection: React.FC = () => {
     }
   };
 
-  // Renderização do componente
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -340,7 +342,6 @@ const WhatsAppAttendanceSection: React.FC = () => {
 
         {isConfigOpen && (
           <div className="p-6 space-y-6 border-t border-gray-200 animate-fade-in">
-            {/* ATIVAR/DESATIVAR ASSISTENTE */}
             <div>
               <label className="flex items-center justify-between cursor-pointer">
                 <span className="flex flex-col">
@@ -360,7 +361,6 @@ const WhatsAppAttendanceSection: React.FC = () => {
               </label>
             </div>
 
-            {/* CAMPOS DE CONFIGURAÇÃO */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="restaurantName" className="block text-sm font-medium text-gray-700 mb-1">Nome do Restaurante</label>
@@ -393,7 +393,6 @@ const WhatsAppAttendanceSection: React.FC = () => {
               <p className="mt-2 text-xs text-gray-500">Esta é a primeira mensagem que o assistente enviará. Use emojis para deixar mais amigável! 🚀</p>
             </div>
 
-            {/* BOTÃO SALVAR */}
             <div className="flex justify-end">
               <button
                 onClick={handleSaveConfig}
