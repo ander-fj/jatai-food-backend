@@ -232,7 +232,7 @@ const initializeWhatsAppClient = async (sessionId) => {
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão: ${reason}`);
     
-    const destructiveReasons = ['AUTHENTICATION_FAILED', 'LOGOUT', 'CHANGE_IN_CACHE'];
+    const destructiveReasons = ['AUTHENTICATION_FAILED', 'CHANGE_IN_CACHE'];
     
     if (destructiveReasons.includes(reason)) {
         console.log(`[Sessão ${sessionId}] O motivo da desconexão requer limpeza completa da sessão. Limpando...`);
