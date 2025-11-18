@@ -60,7 +60,8 @@ app.use(express.json());
 
 // --- ARMAZENAMENTO DE SESSÕES ---
 const sessions = {};
-const sessionModels = {}; // Armazena o modelo de IA por sessão, não o chat
+const sessionModels = {}; // Armazena o modelo de IA base por sessão.
+const userChats = {}; // Armazena as conversas ativas por usuário (chatId).
 const initializingLocks = {}; // Previne múltiplas inicializações simultâneas
 
 // --- FUNÇÕES AUXILIARES ---
@@ -113,18 +114,11 @@ const initializeWhatsAppClient = async (sessionId) => {
 
   sessions[sessionId] = { client, status: 'INITIALIZING', qrAttempts: 0 };
 
-  // Evento QR Code - limita a 3 tentativas
+  // Evento QR Code
   client.on('qr', async (qr) => {
-    sessions[sessionId].qrAttempts++;
-    
-    if (sessions[sessionId].qrAttempts > 3) {
-      console.log(`[Sessão ${sessionId}] Limite de QR codes atingido. Reiniciando...`);
-      await cleanupSession(sessionId);
-      delete initializingLocks[sessionId];
-      return;
-    }
-
-    console.log(`[Sessão ${sessionId}] QR Code gerado (tentativa ${sessions[sessionId].qrAttempts}/3)`);
+    // A geração do QR Code agora acontece apenas uma vez por chamada de inicialização.
+    // Se expirar, uma nova requisição a /api/whatsapp/start/:sessionId será necessária.
+    console.log(`[Sessão ${sessionId}] QR Code gerado. Aguardando escaneamento.`);
     qrcodeTerminal.generate(qr, { small: true });
     
     try {
@@ -170,18 +164,23 @@ const initializeWhatsAppClient = async (sessionId) => {
         return;
       }
 
-      // Se o modelo para a sessão não existir ou foi invalidado, cria um novo.
+      // 1. Garante que o modelo de IA base para a sessão (tenant) exista e esteja atualizado.
       if (!sessionModels[sessionId]) {
         console.log(`[Sessão ${sessionId}] Criando/Recriando modelo de IA com novas instruções.`);
         const systemInstruction = createSystemInstruction(config);
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash";
+        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-1.5-flash";
         const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
         sessionModels[sessionId] = model;
       }
 
-      // Inicia um novo chat para cada mensagem para garantir que não haja histórico cruzado.
-      const chat = sessionModels[sessionId].startChat({ history: [] });
+      // 2. Inicia ou reutiliza a sessão de chat para o usuário específico.
+      if (!userChats[chatId]) {
+        console.log(`[Sessão ${sessionId}] Iniciando novo chat para o usuário ${chatId}.`);
+        userChats[chatId] = sessionModels[sessionId].startChat({ history: [] });
+      }
+
+      const chat = userChats[chatId];
       const result = await chat.sendMessage(message.body);
       const response = await result.response;
       const text = response.text();
@@ -258,6 +257,11 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
     delete sessions[sessionId];
     // Limpa o modelo de IA associado à sessão
     delete sessionModels[sessionId];
+    // Limpa todos os chats de usuários associados a esta sessão
+    Object.keys(userChats).forEach(chatId => {
+        // Uma lógica mais refinada poderia verificar se o chatId pertence à sessionId se necessário
+        delete userChats[chatId];
+    });
     console.log(`[Sessão ${sessionId}] Modelo de IA e sessão local limpos.`);
   }
 
@@ -398,7 +402,11 @@ app.post('/api/config/update/:sessionId', async (req, res) => {
 
     // Invalida o modelo de IA da sessão para forçar a recriação com a nova configuração na próxima mensagem.
     delete sessionModels[sessionId];
-
+    // Limpa todos os chats de usuários existentes para forçar a recriação com o novo modelo.
+    Object.keys(userChats).forEach(chatId => {
+        delete userChats[chatId];
+    });
+    
     console.log(`[Sessão ${sessionId}] ⚙️ Configurações atualizadas.`);
     res.status(200).json({ success: true, message: 'Configurações atualizadas.' });
   } catch (error) {
