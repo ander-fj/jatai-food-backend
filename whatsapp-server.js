@@ -60,7 +60,7 @@ app.use(express.json());
 
 // --- ARMAZENAMENTO DE SESSÕES ---
 const sessions = {};
-const chatContexts = {};
+const sessionModels = {}; // Armazena o modelo de IA por sessão, não o chat
 const initializingLocks = {}; // Previne múltiplas inicializações simultâneas
 
 // --- FUNÇÕES AUXILIARES ---
@@ -170,16 +170,18 @@ const initializeWhatsAppClient = async (sessionId) => {
         return;
       }
 
-      if (!chatContexts[chatId]) {
-        console.log(`[Sessão ${sessionId}] Iniciando novo contexto de chat para ${chatId}`);
+      // Se o modelo para a sessão não existir ou foi invalidado, cria um novo.
+      if (!sessionModels[sessionId]) {
+        console.log(`[Sessão ${sessionId}] Criando/Recriando modelo de IA com novas instruções.`);
         const systemInstruction = createSystemInstruction(config);
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash";
+        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-1.5-flash";
         const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
-        chatContexts[chatId] = model.startChat({ history: [] });
+        sessionModels[sessionId] = model;
       }
 
-      const chat = chatContexts[chatId];
+      // Inicia um novo chat para cada mensagem para garantir que não haja histórico cruzado.
+      const chat = sessionModels[sessionId].startChat({ history: [] });
       const result = await chat.sendMessage(message.body);
       const response = await result.response;
       const text = response.text();
@@ -195,15 +197,15 @@ const initializeWhatsAppClient = async (sessionId) => {
 
   // Evento de Desconexão
   client.on('disconnected', async (reason) => {
-    console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão:`, reason);
+    console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão: ${reason}`);
     
-    // Logout programático ou pelo usuário no celular não deve apagar a sessão.
-    // Falha na autenticação (ex: token inválido) deve apagar para forçar novo QR.
-    if (reason === 'AUTHENTICATION_FAILED') {
-        console.log(`[Sessão ${sessionId}] Falha de autenticação. Limpeza completa da sessão necessária.`);
+    const destructiveReasons = ['AUTHENTICATION_FAILED', 'LOGOUT', 'CHANGE_IN_CACHE'];
+    
+    if (destructiveReasons.includes(reason)) {
+        console.log(`[Sessão ${sessionId}] O motivo da desconexão requer limpeza completa da sessão. Limpando...`);
         await cleanupSession(sessionId, true); // Força a remoção da pasta de autenticação
     } else {
-        console.log(`[Sessão ${sessionId}] Desconexão normal. Apenas destruindo o cliente.`);
+        console.log(`[Sessão ${sessionId}] Desconexão não destrutiva. Apenas destruindo o cliente para uma futura reconexão.`);
         await cleanupSession(sessionId, false); // Apenas destrói o cliente, mantém a autenticação
     }
     delete initializingLocks[sessionId];
@@ -245,12 +247,6 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   // Remove do Firebase
   await remove(ref(database, `tenants/${sessionId}/session`));
   
-  // Limpa contextos de chat
-  Object.keys(chatContexts).forEach(chatId => {
-    if (chatContexts[chatId]) {
-      delete chatContexts[chatId];
-    }
-  });
 
   // Destrói o cliente
   if (sessions[sessionId] && sessions[sessionId].client) {
@@ -260,6 +256,9 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
       console.error(`[Sessão ${sessionId}] Erro ao destruir cliente:`, error);
     }
     delete sessions[sessionId];
+    // Limpa o modelo de IA associado à sessão
+    delete sessionModels[sessionId];
+    console.log(`[Sessão ${sessionId}] Modelo de IA e sessão local limpos.`);
   }
 
   // Remove a pasta da sessão APENAS se forçado (logout, etc.)
@@ -397,10 +396,8 @@ app.post('/api/config/update/:sessionId', async (req, res) => {
     const configRef = ref(database, `tenants/${sessionId}/whatsappConfig`);
     await set(configRef, newConfig);
 
-    // Limpa contextos de chat para forçar recriação com nova config
-    Object.keys(chatContexts).forEach(chatId => {
-      delete chatContexts[chatId];
-    });
+    // Invalida o modelo de IA da sessão para forçar a recriação com a nova configuração na próxima mensagem.
+    delete sessionModels[sessionId];
 
     console.log(`[Sessão ${sessionId}] ⚙️ Configurações atualizadas.`);
     res.status(200).json({ success: true, message: 'Configurações atualizadas.' });
