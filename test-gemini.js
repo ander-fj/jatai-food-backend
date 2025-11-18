@@ -60,7 +60,7 @@ async function testGeminiModels() {
     console.log("\n✅ Modelos Funcionais:");
     workingModels.forEach(m => console.log(`  - ${m}`));
     console.log("\nVocê pode usar qualquer um desses nomes de modelo no seu arquivo 'whatsapp-server.js'.");
-    console.log("Recomendamos 'gemini-1.5-flash' para um bom equilíbrio entre custo e performance.");
+    console.log("Recomendamos 'gemini-2.5-flash' para um bom equilíbrio entre custo e performance.");
   } else {
     console.log("\n❌ Nenhum modelo Gemini funcional foi encontrado.");
   }
