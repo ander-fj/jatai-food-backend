@@ -8,6 +8,8 @@ require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
 const { getDatabase, ref, get, set, remove } = require('firebase/database');
+const fs = require('fs');
+const path = require('path');
 
 // --- VALIDAÇÃO DE VARIÁVEIS DE AMBIENTE ---
 const requiredEnvVars = [
@@ -316,6 +318,7 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   
   // Limpa sessão anterior se existir
   if (sessions[sessionId]) {
+    console.log(`[Sessão ${sessionId}] ⚠️ Sessão existente encontrada. Limpando antes de reiniciar por nova requisição.`);
     await cleanupSession(sessionId);
   }
   
