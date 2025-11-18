@@ -195,8 +195,15 @@ const initializeWhatsAppClient = async (sessionId) => {
   // Evento de Desconexão
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão:`, reason);
-    // Limpa a sessão completamente em qualquer caso de desconexão para garantir um estado limpo.
-    await cleanupSession(sessionId);
+    // Apenas limpa a sessão se o logout foi explícito ou a autenticação falhou.
+    // Outros erros (como falhas de rede) podem ser recuperáveis na próxima tentativa.
+    if (reason === 'LOGOUT' || reason === 'AUTHENTICATION_FAILED') {
+        console.log(`[Sessão ${sessionId}] Razão da desconexão requer limpeza completa da sessão.`);
+        await cleanupSession(sessionId, true); // Passa true para forçar a remoção da pasta
+    } else {
+        console.log(`[Sessão ${sessionId}] Desconexão recuperável. Apenas destruindo o cliente.`);
+        await cleanupSession(sessionId, false); // Passa false para não remover a pasta
+    }
     delete initializingLocks[sessionId];
   });
   
@@ -230,8 +237,8 @@ const initializeWhatsAppClient = async (sessionId) => {
 };
 
 // Função de limpeza de sessão
-const cleanupSession = async (sessionId) => {
-  console.log(`[Sessão ${sessionId}] 🧹 Limpando sessão...`);
+const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
+  console.log(`[Sessão ${sessionId}] 🧹 Limpando sessão... (Remover Auth: ${forceRemoveAuth})`);
   
   // Remove do Firebase
   await remove(ref(database, `tenants/${sessionId}/session`));
@@ -253,15 +260,17 @@ const cleanupSession = async (sessionId) => {
     delete sessions[sessionId];
   }
 
-  // Remove a pasta da sessão para forçar um novo QR code em caso de logout/erro
-  const sessionFolderPath = path.join('.wwebjs_auth', `session-${sessionId}`);
-  try {
-    if (fs.existsSync(sessionFolderPath)) {
-      fs.rmSync(sessionFolderPath, { recursive: true, force: true });
-      console.log(`[Sessão ${sessionId}] Pasta da sessão .wwebjs_auth/session-${sessionId} removida.`);
+  // Remove a pasta da sessão APENAS se forçado (logout, etc.)
+  if (forceRemoveAuth) {
+    const sessionFolderPath = path.join('.wwebjs_auth', `session-${sessionId}`);
+    try {
+      if (fs.existsSync(sessionFolderPath)) {
+        fs.rmSync(sessionFolderPath, { recursive: true, force: true });
+        console.log(`[Sessão ${sessionId}] Pasta da sessão .wwebjs_auth/session-${sessionId} removida FORÇADAMENTE.`);
+      }
+    } catch (err) {
+      console.error(`[Sessão ${sessionId}] Erro ao remover a pasta da sessão:`, err);
     }
-  } catch (err) {
-    console.error(`[Sessão ${sessionId}] Erro ao remover a pasta da sessão:`, err);
   }
 };
 
