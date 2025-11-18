@@ -80,18 +80,12 @@ const createSystemInstruction = (config) => `
 `;
 
 const initializeWhatsAppClient = async (sessionId) => {
-  // Previne múltiplas inicializações simultâneas
-  if (initializingLocks[sessionId]) {
-    console.log(`[Sessão ${sessionId}] Já está inicializando. Aguardando...`);
-    return;
-  }
-
+  // Verifica se já existe uma instância ativa
   if (sessions[sessionId] && sessions[sessionId].client) {
     console.log(`[Sessão ${sessionId}] Já existe uma instância ativa.`);
     return;
   }
 
-  initializingLocks[sessionId] = true;
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
 
   console.log(`[Sessão ${sessionId}] Configurando novo cliente...`);
@@ -114,16 +108,33 @@ const initializeWhatsAppClient = async (sessionId) => {
 
   sessions[sessionId] = { client, status: 'INITIALIZING', qrAttempts: 0 };
 
+  // Limite máximo de tentativas de QR code
+  const MAX_QR_ATTEMPTS = 3;
+
   // Evento QR Code
   client.on('qr', async (qr) => {
-    // A geração do QR Code agora acontece apenas uma vez por chamada de inicialização.
-    // Se expirar, uma nova requisição a /api/whatsapp/start/:sessionId será necessária.
-    console.log(`[Sessão ${sessionId}] QR Code gerado. Aguardando escaneamento.`);
+    // Incrementa o contador de tentativas
+    sessions[sessionId].qrAttempts++;
+    
+    console.log(`[Sessão ${sessionId}] QR Code gerado (Tentativa ${sessions[sessionId].qrAttempts}/${MAX_QR_ATTEMPTS}). Aguardando escaneamento.`);
+    
+    // Verifica se excedeu o número máximo de tentativas
+    if (sessions[sessionId].qrAttempts > MAX_QR_ATTEMPTS) {
+      console.log(`[Sessão ${sessionId}] ⚠️ Número máximo de tentativas de QR code atingido. Encerrando inicialização.`);
+      await set(sessionRef, { 
+        status: 'QR_EXPIRED', 
+        message: 'QR code expirou. Por favor, solicite uma nova inicialização.' 
+      });
+      await cleanupSession(sessionId, false);
+      delete initializingLocks[sessionId];
+      return;
+    }
+    
     qrcodeTerminal.generate(qr, { small: true });
     
     try {
       const qrUrl = await qrcode.toDataURL(qr);
-      await set(sessionRef, { status: 'QR_CODE', qr: qrUrl });
+      await set(sessionRef, { status: 'QR_CODE', qr: qrUrl, attempt: sessions[sessionId].qrAttempts });
       sessions[sessionId].status = 'QR_CODE';
     } catch (error) {
       console.error(`[Sessão ${sessionId}] Erro ao gerar QR code:`, error);
@@ -207,7 +218,12 @@ const initializeWhatsAppClient = async (sessionId) => {
         console.log(`[Sessão ${sessionId}] Desconexão não destrutiva. Apenas destruindo o cliente para uma futura reconexão.`);
         await cleanupSession(sessionId, false); // Apenas destrói o cliente, mantém a autenticação
     }
-    delete initializingLocks[sessionId];
+    
+    // Remove o lock de inicialização
+    if (initializingLocks[sessionId]) {
+      console.log(`[Sessão ${sessionId}] 🔓 Lock de inicialização removido após desconexão.`);
+      delete initializingLocks[sessionId];
+    }
   });
   
   // Evento de Falha de Autenticação
@@ -215,8 +231,12 @@ const initializeWhatsAppClient = async (sessionId) => {
     console.error(`[Sessão ${sessionId}] ❌ Falha na autenticação:`, msg);
     await set(sessionRef, { status: 'AUTH_FAILURE', error: msg });
     sessions[sessionId].status = 'AUTH_FAILURE';
-    await cleanupSession(sessionId);
-    delete initializingLocks[sessionId];
+    await cleanupSession(sessionId, true); // Força limpeza completa em caso de falha de autenticação
+    
+    if (initializingLocks[sessionId]) {
+      console.log(`[Sessão ${sessionId}] 🔓 Lock de inicialização removido após falha de autenticação.`);
+      delete initializingLocks[sessionId];
+    }
   });
 
   // Inicialização com timeout
@@ -234,8 +254,12 @@ const initializeWhatsAppClient = async (sessionId) => {
   } catch (error) {
     console.error(`[Sessão ${sessionId}] ❌ Erro crítico na inicialização:`, error);
     await set(sessionRef, { status: 'ERROR', error: error.message });
-    await cleanupSession(sessionId);
-    delete initializingLocks[sessionId];
+    await cleanupSession(sessionId, false); // Não força limpeza de auth em caso de timeout
+    
+    if (initializingLocks[sessionId]) {
+      console.log(`[Sessão ${sessionId}] 🔓 Lock de inicialização removido após erro crítico.`);
+      delete initializingLocks[sessionId];
+    }
   }
 };
 
@@ -316,7 +340,11 @@ app.get('/api/whatsapp/qr/:sessionId', async (req, res) => {
 app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
 
+  console.log(`[Sessão ${sessionId}] 📥 Recebida requisição para iniciar.`);
+
+  // Verifica se já está inicializando
   if (initializingLocks[sessionId]) {
+    console.log(`[Sessão ${sessionId}] ⚠️ Sessão já está sendo inicializada. Requisição bloqueada.`);
     return res.status(409).json({
       success: false,
       message: 'Sessão já está sendo inicializada. Aguarde.',
@@ -329,7 +357,7 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
     try {
       const state = await session.client.getState();
       if (state === 'CONNECTED') {
-        console.log(`[Sessão ${sessionId}] Cliente já conectado (estado: ${state}). Requisição de início ignorada.`);
+        console.log(`[Sessão ${sessionId}] ✅ Cliente já conectado (estado: ${state}). Requisição de início ignorada.`);
         return res.status(200).json({ success: true, message: 'Sessão já está conectada.' });
       }
       console.log(`[Sessão ${sessionId}] Cliente existente em estado não ideal: ${state || 'N/A'}. Prosseguindo com a reinicialização.`);
@@ -338,18 +366,21 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
     }
   }
 
-  console.log(`[Sessão ${sessionId}] 📥 Recebida requisição para iniciar.`);
-
   if (sessions[sessionId]) {
     console.log(`[Sessão ${sessionId}] ⚠️ Sessão existente encontrada. Limpando antes de reiniciar.`);
     await cleanupSession(sessionId, false); // Limpa a sessão anterior sem apagar a autenticação
   }
+
+  // Define o lock ANTES de iniciar a inicialização
+  initializingLocks[sessionId] = true;
+  console.log(`[Sessão ${sessionId}] 🔒 Lock de inicialização ativado.`);
 
   await remove(ref(database, `tenants/${sessionId}/session/qr`));
   await set(ref(database, `tenants/${sessionId}/session/status`), 'INITIALIZING');
 
   initializeWhatsAppClient(sessionId).catch(err => {
     console.error(`[Sessão ${sessionId}] Falha não capturada na inicialização:`, err);
+    delete initializingLocks[sessionId];
   });
 
   res.status(202).json({
