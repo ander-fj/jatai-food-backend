@@ -195,14 +195,15 @@ const initializeWhatsAppClient = async (sessionId) => {
   // Evento de Desconexão
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão:`, reason);
-    // Apenas limpa a sessão se o logout foi explícito ou a autenticação falhou.
-    // Outros erros (como falhas de rede) podem ser recuperáveis na próxima tentativa.
-    if (reason === 'LOGOUT' || reason === 'AUTHENTICATION_FAILED') {
-        console.log(`[Sessão ${sessionId}] Razão da desconexão requer limpeza completa da sessão.`);
-        await cleanupSession(sessionId, true); // Passa true para forçar a remoção da pasta
+    
+    // Logout programático ou pelo usuário no celular não deve apagar a sessão.
+    // Falha na autenticação (ex: token inválido) deve apagar para forçar novo QR.
+    if (reason === 'AUTHENTICATION_FAILED') {
+        console.log(`[Sessão ${sessionId}] Falha de autenticação. Limpeza completa da sessão necessária.`);
+        await cleanupSession(sessionId, true); // Força a remoção da pasta de autenticação
     } else {
-        console.log(`[Sessão ${sessionId}] Desconexão recuperável. Apenas destruindo o cliente.`);
-        await cleanupSession(sessionId, false); // Passa false para não remover a pasta
+        console.log(`[Sessão ${sessionId}] Desconexão normal. Apenas destruindo o cliente.`);
+        await cleanupSession(sessionId, false); // Apenas destrói o cliente, mantém a autenticação
     }
     delete initializingLocks[sessionId];
   });
@@ -348,7 +349,7 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
 
   if (sessions[sessionId]) {
     console.log(`[Sessão ${sessionId}] ⚠️ Sessão existente encontrada. Limpando antes de reiniciar.`);
-    await cleanupSession(sessionId, true); // Força a limpeza para um reinício seguro
+    await cleanupSession(sessionId, false); // Limpa a sessão anterior sem apagar a autenticação
   }
 
   await remove(ref(database, `tenants/${sessionId}/session/qr`));
