@@ -193,11 +193,15 @@ const initializeWhatsAppClient = async (sessionId) => {
   // Evento de Desconexão
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão:`, reason);
-    // Apenas atualiza o status, não limpa a sessão inteira para evitar race conditions
-    if (sessions[sessionId]) {
-      sessions[sessionId].status = 'disconnected';
+    try {
+      // Apenas atualiza o status, não limpa a sessão inteira para evitar race conditions
+      if (sessions[sessionId]) {
+        sessions[sessionId].status = 'disconnected';
+      }
+      await set(sessionRef, { status: 'disconnected', reason: reason });
+    } catch (error) {
+      console.error(`[Sessão ${sessionId}] Erro ao atualizar status de desconexão no Firebase:`, error);
     }
-    await set(sessionRef, { status: 'disconnected', reason: reason });
     delete initializingLocks[sessionId];
   });
   
