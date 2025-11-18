@@ -203,7 +203,7 @@ const initializeWhatsAppClient = async (sessionId) => {
         console.log(`[Sessão ${sessionId}] Criando/Recriando modelo de IA com novas instruções.`);
         const systemInstruction = createSystemInstruction(config);
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-1.5-flash";
+        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash";
         const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
         sessionModels[sessionId] = model;
       }
@@ -232,13 +232,19 @@ const initializeWhatsAppClient = async (sessionId) => {
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão: ${reason}`);
     
-    const destructiveReasons = ['AUTHENTICATION_FAILED', 'CHANGE_IN_CACHE'];
+    // Razões que exigem a remoção completa da autenticação para forçar um novo QR code.
+    const destructiveReasons = ['AUTHENTICATION_FAILED', 'CHANGE_IN_CACHE', 'UNPAIRED'];
     
-    if (destructiveReasons.includes(reason)) {
-        console.log(`[Sessão ${sessionId}] O motivo da desconexão requer limpeza completa da sessão. Limpando...`);
+    // O logout (desconexão pelo celular, por exemplo) não deve remover a autenticação.
+    // Isso permite que o sistema tente reconectar automaticamente sem precisar de um novo QR code.
+    if (reason === 'LOGOUT') {
+        console.log(`[Sessão ${sessionId}] Desconexão por logout. A sessão será encerrada, mas os dados de autenticação serão mantidos para tentar uma reconexão automática.`);
+        await cleanupSession(sessionId, false); // NUNCA remova a autenticação em um logout simples.
+    } else if (destructiveReasons.includes(reason)) {
+        console.log(`[Sessão ${sessionId}] O motivo da desconexão (${reason}) requer limpeza completa da sessão. Limpando...`);
         await cleanupSession(sessionId, true); // Força a remoção da pasta de autenticação
     } else {
-        console.log(`[Sessão ${sessionId}] Desconexão não destrutiva. Apenas destruindo o cliente para uma futura reconexão.`);
+        console.log(`[Sessão ${sessionId}] Desconexão não destrutiva (${reason}). Apenas limpando a instância do cliente para uma futura reconexão.`);
         await cleanupSession(sessionId, false); // Apenas destrói o cliente, mantém a autenticação
     }
     
@@ -378,50 +384,49 @@ app.get('/api/whatsapp/qr/:sessionId', async (req, res) => {
 
 app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
-
   console.log(`[Sessão ${sessionId}] 📥 Recebida requisição para iniciar.`);
 
-  // Verifica se já está inicializando
+  // Otimização: Verifica se a sessão já está pronta e conectada.
+  if (sessions[sessionId]?.status === 'ready') {
+    try {
+      const state = await sessions[sessionId].client.getState();
+      if (state === 'CONNECTED') {
+        console.log(`[Sessão ${sessionId}] ✅ Cliente já conectado e pronto. Requisição ignorada.`);
+        return res.status(200).json({ success: true, message: 'Sessão já está conectada.' });
+      }
+      console.log(`[Sessão ${sessionId}] ⚠️ Cliente em estado 'ready' mas não conectado ('${state}'). Tentando reiniciar.`);
+    } catch (e) {
+      console.log(`[Sessão ${sessionId}] ⚠️ Cliente em estado 'ready' mas inacessível: ${e.message}. Prosseguindo para reiniciar.`);
+      // Limpa a sessão corrompida antes de continuar
+      await cleanupSession(sessionId, false);
+    }
+  }
+
+  // Bloqueia múltiplas inicializações concorrentes.
   if (initializingLocks[sessionId]) {
     console.log(`[Sessão ${sessionId}] ⚠️ Sessão já está sendo inicializada. Requisição bloqueada.`);
     return res.status(409).json({
       success: false,
-      message: 'Sessão já está sendo inicializada. Aguarde.',
+      message: 'A sessão já está em processo de inicialização. Por favor, aguarde.',
     });
   }
 
-  const session = sessions[sessionId];
-  // Verifica o estado do cliente apenas se a sessão e o cliente existirem
-  if (session?.client) {
-    try {
-      const state = await session.client.getState();
-      if (state === 'CONNECTED') {
-        console.log(`[Sessão ${sessionId}] ✅ Cliente já conectado (estado: ${state}). Requisição de início ignorada.`);
-        return res.status(200).json({ success: true, message: 'Sessão já está conectada.' });
-      }
-      console.log(`[Sessão ${sessionId}] Cliente existente em estado não ideal: ${state || 'N/A'}. Prosseguindo com a reinicialização.`);
-    } catch (error) {
-      console.log(`[Sessão ${sessionId}] Cliente não pôde ser alcançado: ${error.message}. Prosseguindo com a reinicialização.`);
-    }
-  }
-
-  if (sessions[sessionId]) {
-    console.log(`[Sessão ${sessionId}] ⚠️ Sessão existente encontrada. Limpando antes de reiniciar.`);
-    await cleanupSession(sessionId, false); // Limpa a sessão anterior sem apagar a autenticação
-  }
-
-  // Define o lock ANTES de iniciar a inicialização
+  // Ativa o lock de inicialização
   initializingLocks[sessionId] = true;
   console.log(`[Sessão ${sessionId}] 🔒 Lock de inicialização ativado.`);
-
-  await remove(ref(database, `tenants/${sessionId}/session/qr`));
+  
+  // Define o status inicial no Firebase
   await set(ref(database, `tenants/${sessionId}/session/status`), 'INITIALIZING');
 
+  // A lógica principal de inicialização é chamada aqui.
+  // O catch lida com falhas inesperadas durante a chamada.
   initializeWhatsAppClient(sessionId).catch(err => {
-    console.error(`[Sessão ${sessionId}] Falha não capturada na inicialização:`, err);
+    console.error(`[Sessão ${sessionId}] ❌ Falha não capturada na inicialização:`, err);
+    // Garante que o lock seja liberado em caso de erro.
     delete initializingLocks[sessionId];
   });
 
+  // Responde imediatamente para não bloquear o cliente.
   res.status(202).json({
     success: true,
     message: `Inicialização da sessão ${sessionId} iniciada.`,
