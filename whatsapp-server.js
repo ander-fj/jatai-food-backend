@@ -310,43 +310,57 @@ app.get('/api/whatsapp/qr/:sessionId', async (req, res) => {
 
 app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
-  
-  // Verifica se já está inicializando
+
   if (initializingLocks[sessionId]) {
-    return res.status(409).json({ 
-      success: false, 
-      message: 'Sessão já está sendo inicializada. Aguarde.' 
+    return res.status(409).json({
+      success: false,
+      message: 'Sessão já está sendo inicializada. Aguarde.',
     });
   }
 
-  // Verifica se já está conectado
+  const session = sessions[sessionId];
+  if (session && session.client) {
+    try {
+      const state = await session.client.getState();
+      // O estado 'CONNECTED' na biblioteca whatsapp-web.js indica que o cliente está autenticado e pronto.
+      if (state === 'CONNECTED') {
+        console.log(`[Sessão ${sessionId}] Cliente já conectado (estado: ${state}). Requisição de início ignorada.`);
+        return res.status(200).json({
+          success: true,
+          message: 'Sessão já está conectada.',
+        });
+      }
+      console.log(`[Sessão ${sessionId}] Cliente existente encontrado em estado não ideal: ${state || 'N/A'}. Prosseguindo com a reinicialização.`);
+    } catch (error) {
+      console.log(`[Sessão ${sessionId}] Erro ao obter estado do cliente: ${error.message}. Prosseguindo com a reinicialização.`);
+    }
+  }
+
+  // A verificação de status local é uma segurança adicional.
   if (sessions[sessionId] && sessions[sessionId].status === 'ready') {
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Sessão já está conectada.' 
+    return res.status(200).json({
+      success: true,
+      message: 'Sessão já está conectada.',
     });
   }
 
   console.log(`[Sessão ${sessionId}] 📥 Recebida requisição para iniciar.`);
-  
-  // Limpa sessão anterior se existir
+
   if (sessions[sessionId]) {
-    console.log(`[Sessão ${sessionId}] ⚠️ Sessão existente encontrada. Limpando antes de reiniciar por nova requisição.`);
-    await cleanupSession(sessionId);
+    console.log(`[Sessão ${sessionId}] ⚠️ Sessão existente encontrada. Limpando antes de reiniciar.`);
+    await cleanupSession(sessionId, true); // Força a limpeza para um reinício seguro
   }
-  
-  // Limpa QR code antigo antes de iniciar
+
   await remove(ref(database, `tenants/${sessionId}/session/qr`));
   await set(ref(database, `tenants/${sessionId}/session/status`), 'INITIALIZING');
-  
-  // Inicializa de forma assíncrona
+
   initializeWhatsAppClient(sessionId).catch(err => {
-    console.error(`[Sessão ${sessionId}] Falha não capturada:`, err);
+    console.error(`[Sessão ${sessionId}] Falha não capturada na inicialização:`, err);
   });
-  
-  res.status(202).json({ 
-    success: true, 
-    message: `Inicialização da sessão ${sessionId} iniciada.` 
+
+  res.status(202).json({
+    success: true,
+    message: `Inicialização da sessão ${sessionId} iniciada.`,
   });
 });
 
