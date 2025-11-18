@@ -195,21 +195,8 @@ const initializeWhatsAppClient = async (sessionId) => {
   // Evento de Desconexão
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão:`, reason);
-    
-    if (reason === 'LOGOUT') {
-      console.log(`[Sessão ${sessionId}] Desconexão por LOGOUT. A sessão é irrecuperável e será limpa.`);
-      await cleanupSession(sessionId);
-    } else {
-      // Para outras falhas, apenas atualiza o status para uma possível reconexão futura.
-      try {
-        if (sessions[sessionId]) {
-          sessions[sessionId].status = 'disconnected';
-        }
-        await set(sessionRef, { status: 'disconnected', reason: reason });
-      } catch (error) {
-        console.error(`[Sessão ${sessionId}] Erro ao atualizar status de desconexão no Firebase:`, error);
-      }
-    }
+    // Limpa a sessão completamente em qualquer caso de desconexão para garantir um estado limpo.
+    await cleanupSession(sessionId);
     delete initializingLocks[sessionId];
   });
   
@@ -264,6 +251,17 @@ const cleanupSession = async (sessionId) => {
       console.error(`[Sessão ${sessionId}] Erro ao destruir cliente:`, error);
     }
     delete sessions[sessionId];
+  }
+
+  // Remove a pasta da sessão para forçar um novo QR code em caso de logout/erro
+  const sessionFolderPath = path.join('.wwebjs_auth', `session-${sessionId}`);
+  try {
+    if (fs.existsSync(sessionFolderPath)) {
+      fs.rmSync(sessionFolderPath, { recursive: true, force: true });
+      console.log(`[Sessão ${sessionId}] Pasta da sessão .wwebjs_auth/session-${sessionId} removida.`);
+    }
+  } catch (err) {
+    console.error(`[Sessão ${sessionId}] Erro ao remover a pasta da sessão:`, err);
   }
 };
 
