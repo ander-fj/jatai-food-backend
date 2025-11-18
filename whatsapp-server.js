@@ -123,7 +123,7 @@ const initializeWhatsAppClient = async (sessionId) => {
     
     try {
       const qrUrl = await qrcode.toDataURL(qr);
-      await set(sessionRef, { status: 'QR_CODE', qr: qrUrl, attempt: sessions[sessionId].qrAttempts });
+      await set(sessionRef, { status: 'QR_CODE', qr: qrUrl });
       sessions[sessionId].status = 'QR_CODE';
     } catch (error) {
       console.error(`[Sessão ${sessionId}] Erro ao gerar QR code:`, error);
@@ -223,13 +223,13 @@ const initializeWhatsAppClient = async (sessionId) => {
   try {
     console.log(`[Sessão ${sessionId}] 🚀 Inicializando cliente...`);
     
-    // Timeout de 60 segundos para inicialização
+    // Timeout de 120 segundos para inicialização
     const initPromise = client.initialize();
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Timeout na inicialização')), 120000)
     );
     
-    await Promise.race([initPromise, timeoutPromise]);
+    await Promise.race([initPromise, timeoutPromise]); // Usa Promise.race para competir com o timeout
     
   } catch (error) {
     console.error(`[Sessão ${sessionId}] ❌ Erro crítico na inicialização:`, error);
@@ -324,29 +324,18 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   }
 
   const session = sessions[sessionId];
-  if (session && session.client) {
+  // Verifica o estado do cliente apenas se a sessão e o cliente existirem
+  if (session?.client) {
     try {
       const state = await session.client.getState();
-      // O estado 'CONNECTED' na biblioteca whatsapp-web.js indica que o cliente está autenticado e pronto.
       if (state === 'CONNECTED') {
         console.log(`[Sessão ${sessionId}] Cliente já conectado (estado: ${state}). Requisição de início ignorada.`);
-        return res.status(200).json({
-          success: true,
-          message: 'Sessão já está conectada.',
-        });
+        return res.status(200).json({ success: true, message: 'Sessão já está conectada.' });
       }
-      console.log(`[Sessão ${sessionId}] Cliente existente encontrado em estado não ideal: ${state || 'N/A'}. Prosseguindo com a reinicialização.`);
+      console.log(`[Sessão ${sessionId}] Cliente existente em estado não ideal: ${state || 'N/A'}. Prosseguindo com a reinicialização.`);
     } catch (error) {
-      console.log(`[Sessão ${sessionId}] Erro ao obter estado do cliente: ${error.message}. Prosseguindo com a reinicialização.`);
+      console.log(`[Sessão ${sessionId}] Cliente não pôde ser alcançado: ${error.message}. Prosseguindo com a reinicialização.`);
     }
-  }
-
-  // A verificação de status local é uma segurança adicional.
-  if (sessions[sessionId] && sessions[sessionId].status === 'ready') {
-    return res.status(200).json({
-      success: true,
-      message: 'Sessão já está conectada.',
-    });
   }
 
   console.log(`[Sessão ${sessionId}] 📥 Recebida requisição para iniciar.`);
