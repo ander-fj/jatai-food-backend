@@ -55,7 +55,30 @@ const allowedOrigins = [
   'https://jatai-food-backend.onrender.com',
   'http://localhost:5173',
 ];
-app.use(cors({ origin: allowedOrigins }));
+
+// Configuração completa de CORS para suportar requisições POST e preflight
+app.use(cors({
+  origin: function (origin, callback) {
+    // Permite requisições sem origin (como Postman, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log(`[CORS] Origem bloqueada: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200,
+  preflightContinue: false
+}));
+
+// Tratamento explícito de requisições OPTIONS (preflight)
+app.options('*', cors());
+
 app.use(express.json());
 
 // --- ARMAZENAMENTO DE SESSÕES ---
@@ -305,7 +328,23 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
 
 // --- ROTAS DA API ---
 
-app.get('/health', (req, res) => res.status(200).send('OK'));
+// Health check endpoint com informações detalhadas
+app.get('/health', (req, res) => {
+  const healthInfo = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: {
+      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB'
+    },
+    activeSessions: Object.keys(sessions).length,
+    environment: process.env.NODE_ENV || 'development'
+  };
+  
+  console.log('[Health Check] Status:', healthInfo);
+  res.status(200).json(healthInfo);
+});
 
 app.get('/api/whatsapp/status/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
