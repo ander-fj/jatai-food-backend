@@ -105,8 +105,14 @@ const createSystemInstruction = (config) => `
 const initializeWhatsAppClient = async (sessionId) => {
   // Verifica se já existe uma instância ativa
   if (sessions[sessionId] && sessions[sessionId].client) {
-    console.log(`[Sessão ${sessionId}] Já existe uma instância ativa.`);
-    return;
+    console.log(`[Sessão ${sessionId}] Já existe uma instância ativa. Destruindo a anterior para iniciar uma nova.`);
+    try {
+      await sessions[sessionId].client.destroy();
+    } catch (error) {
+      console.error(`[Sessão ${sessionId}] Erro ao destruir cliente anterior:`, error);
+    }
+    delete sessions[sessionId];
+    // A função initializeWhatsAppClient continuará para criar uma nova instância.
   }
 
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
@@ -272,6 +278,12 @@ const initializeWhatsAppClient = async (sessionId) => {
         // Isso permite uma reconexão rápida sem precisar escanear o QR code novamente.
         console.log(`[Sessão ${sessionId}] Desconexão não destrutiva (${reason}). Limpando instância do cliente para futura reconexão.`);
         await cleanupSession(sessionId, false); // Apenas destrói o cliente, mantém a autenticação
+        
+        // Tenta a reconexão automática
+        console.log(`[Sessão ${sessionId}] Tentando reconexão automática...`);
+        initializeWhatsAppClient(sessionId).catch(err => {
+            console.error(`[Sessão ${sessionId}] ❌ Falha na reconexão automática:`, err);
+        });
     }
     
     // Remove o lock de inicialização se existir
