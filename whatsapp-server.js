@@ -138,13 +138,16 @@ const initializeWhatsAppClient = async (sessionId) => {
   client.on('qr', async (qr) => {
     const sessionRef = ref(database, `tenants/${sessionId}/session`);
     const snapshot = await get(sessionRef);
-    const firebaseStatus = snapshot.exists() ? snapshot.val().status : 'disconnected';
+    const firebaseSessionData = snapshot.exists() ? snapshot.val() : {};
 
-    // Se o status no Firebase for 'ready', significa que a sessão está conectada.
-    // Ignoramos o evento 'qr' para evitar a geração desnecessária de um novo código.
-    if (firebaseStatus === 'ready') {
-      console.log(`[Sessão ${sessionId}] ⚠️ Evento 'qr' recebido, mas sessão já está 'ready' no Firebase. Ignorando geração de QR Code.`);
-      return;
+    // LÓGICA DE PREVENÇÃO DE QR DESNECESSÁRIO
+    // Se a sessão já foi autenticada com sucesso antes (marcador 'authenticatedOnce')
+    // ou se o status no Firebase é 'ready', não geramos um novo QR code.
+    // Isso previne que uma pequena instabilidade de rede que gere um evento 'qr'
+    // force o usuário a escanear novamente sem necessidade.
+    if (firebaseSessionData.authenticatedOnce || firebaseSessionData.status === 'ready') {
+      console.log(`[Sessão ${sessionId}] ⚠️ Evento 'qr' recebido, mas a sessão já tem uma autenticação válida. Aguardando reconexão automática...`);
+      return; // Ignora a geração do QR Code
     }
 
     // Incrementa o contador de tentativas
@@ -168,6 +171,8 @@ const initializeWhatsAppClient = async (sessionId) => {
     
     try {
       const qrUrl = await qrcode.toDataURL(qr);
+      // Ao gerar um QR, o status é atualizado. O marcador 'authenticatedOnce' será removido
+      // e apenas definido como 'true' novamente no evento 'ready'.
       await set(sessionRef, { status: 'QR_CODE', qr: qrUrl, attempt: sessions[sessionId].qrAttempts });
       sessions[sessionId].status = 'QR_CODE';
     } catch (error) {
@@ -178,7 +183,11 @@ const initializeWhatsAppClient = async (sessionId) => {
   // Evento Ready
   client.on('ready', async () => {
     console.log(`[Sessão ${sessionId}] ✅ Cliente conectado e pronto!`);
-    await set(sessionRef, { status: 'ready', connectedAt: new Date().toISOString() });
+    await set(sessionRef, { 
+      status: 'ready', 
+      connectedAt: new Date().toISOString(),
+      authenticatedOnce: true // Marca que a autenticação já foi bem-sucedida uma vez.
+    });
     sessions[sessionId].status = 'ready';
     sessions[sessionId].qrAttempts = 0;
     delete initializingLocks[sessionId];
