@@ -82,6 +82,7 @@ const userChats = {};
 const initializingLocks = {}; // bloqueio booleano interno
 const activeInitializations = {}; // Promise por sessionId para evitar duplicação
 const reconnectionAttempts = {}; // contador de tentativas de reconexão por session
+const startRequestTimestamps = {}; // timestamp da última requisição /start por session (rate limiting)
 
 // --- FUNÇÕES AUXILIARES ---
 const createSystemInstruction = (config) => `
@@ -450,6 +451,25 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   const forwardedFor = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress || 'unknown';
   const userAgent = req.headers['user-agent'] || 'unknown';
   console.log(`[${requestId}] [Sessão ${sessionId}] 📥 Recebida requisição para iniciar. from=${forwardedFor} ua="${userAgent}"`);
+
+  // RATE LIMITING: Prevenir múltiplas requisições do frontend
+  const now = Date.now();
+  const DEBOUNCE_WINDOW = 10000; // 10 segundos
+  
+  if (startRequestTimestamps[sessionId]) {
+    const timeSinceLastRequest = now - startRequestTimestamps[sessionId];
+    if (timeSinceLastRequest < DEBOUNCE_WINDOW) {
+      const waitTime = Math.ceil((DEBOUNCE_WINDOW - timeSinceLastRequest) / 1000);
+      console.log(`[${requestId}] [Sessão ${sessionId}] ⏱️ Requisição duplicada ignorada (${timeSinceLastRequest}ms desde última).`);
+      return res.status(429).json({ 
+        success: false, 
+        message: `Aguarde ${waitTime} segundos antes de tentar novamente.`,
+        retryAfter: waitTime
+      });
+    }
+  }
+  
+  startRequestTimestamps[sessionId] = now;
 
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
   let snapshot;
