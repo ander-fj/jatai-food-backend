@@ -79,7 +79,7 @@ app.use(express.json());
 const sessions = {};
 const sessionModels = {};
 const userChats = {};
-const initializingLocks = {}; // bloqueio booleano
+const initializingLocks = {}; // bloqueio booleano interno
 const activeInitializations = {}; // Promise por sessionId para evitar duplicação
 const reconnectionAttempts = {}; // contador de tentativas de reconexão por session
 
@@ -103,7 +103,6 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 // Função de limpeza de sessão (melhorada)
 const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   console.log(`[Sessão ${sessionId}] 🧹 Limpando sessão... (Remover Auth: ${forceRemoveAuth})`);
-  
   try {
     await remove(ref(database, `tenants/${sessionId}/session`));
   } catch (e) {
@@ -112,7 +111,6 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
 
   if (sessions[sessionId] && sessions[sessionId].client) {
     try {
-      // Remove listeners e destrói o client
       try { sessions[sessionId].client.removeAllListeners(); } catch (e) {}
       await sessions[sessionId].client.destroy();
     } catch (error) {
@@ -121,7 +119,6 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
     delete sessions[sessionId];
     delete sessionModels[sessionId];
 
-    // Remove userChats que pertencem a esta sessão (se conseguir identificar)
     Object.keys(userChats).forEach(chatId => {
       delete userChats[chatId];
     });
@@ -143,15 +140,12 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
 
 // --- Inicialização do WhatsApp Client (robusta) ---
 const initializeWhatsAppClient = async (sessionId, opts = {}) => {
-  // evita duplicação: se já há uma inicialização em andamento, aguarda a mesma
   if (activeInitializations[sessionId]) {
     console.log(`[Sessão ${sessionId}] 🔁 Inicialização já em andamento - aguardando resultado existente.`);
     return activeInitializations[sessionId];
   }
 
-  // cria promessa que ficará armazenada em activeInitializations
   const initPromise = (async () => {
-    // se já existe um client em memória e está 'ready', evita criar outro
     if (sessions[sessionId] && sessions[sessionId].status === 'ready' && sessions[sessionId].client) {
       try {
         const state = await sessions[sessionId].client.getState();
@@ -161,13 +155,11 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
         }
       } catch (e) {
         console.log(`[Sessão ${sessionId}] ⚠️ Cliente em memória inacessível: ${e.message}. Seguindo com reinitialização.`);
-        // tenta cleanup leve antes de continuar
         try { await sessions[sessionId].client.destroy(); } catch (_) {}
         delete sessions[sessionId];
       }
     }
 
-    // evita reinício concorrente real
     if (initializingLocks[sessionId]) {
       console.log(`[Sessão ${sessionId}] ⏳ Lock detectado - abortando criação duplicada.`);
       throw new Error('Already initializing');
@@ -182,10 +174,8 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       console.warn(`[Sessão ${sessionId}] ⚠️ Falha ao setar status INITIALIZING no Firebase:`, e.message || e);
     }
 
-    // Guarda tentativa de reconexão
     reconnectionAttempts[sessionId] = reconnectionAttempts[sessionId] || 0;
 
-    // Função para criar uma nova instância
     const createClientInstance = () => {
       const client = new Client({
         authStrategy: new LocalAuth({ clientId: sessionId }),
@@ -208,7 +198,6 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       return client;
     };
 
-    // real creation and wiring
     const client = createClientInstance();
     sessions[sessionId] = { client, status: 'INITIALIZING', qrAttempts: 0 };
 
@@ -235,26 +224,21 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       console.log(`[Sessão ${sessionId}] ✅ Autenticado com sucesso!`);
     });
 
-    // Ready event
     client.on('ready', async () => {
       try {
         console.log(`[Sessão ${sessionId}] ✅ Cliente conectado e pronto!`);
         await set(sessionRef, { status: 'ready', connectedAt: new Date().toISOString() });
         sessions[sessionId].status = 'ready';
         sessions[sessionId].qrAttempts = 0;
-        // Remove QR field se existir
         try { await remove(ref(database, `tenants/${sessionId}/session/qr`)); } catch(_) {}
-        // reset reconnection attempts
         reconnectionAttempts[sessionId] = 0;
       } catch (e) {
         console.error(`[Sessão ${sessionId}] Erro no handler 'ready':`, e);
       } finally {
-        // libera lock depois de pronto
         if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
       }
     });
 
-    // Mensagens
     client.on('message', async (message) => {
       if (message.fromMe) return;
       const chatId = message.from;
@@ -298,25 +282,20 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       }
     });
 
-    // Desconexão
     client.on('disconnected', async (reason) => {
       try {
         console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão: ${reason}`);
 
-        // Normaliza motivos comuns que não são destrutivos
         if (!reason) reason = 'UNKNOWN';
         if (reason === 'LOGOUT' || reason.toUpperCase().includes('CONNECTION')) {
-          // Trata LOGOUT como desconexão transitória
           console.log(`[Sessão ${sessionId}] ⚠️ Motivo '${reason}' tratado como desconexão transitória (não destrutiva).`);
           await set(sessionRef, { status: 'disconnected', lastReason: reason, disconnectedAt: new Date().toISOString() });
           sessions[sessionId] && (sessions[sessionId].status = 'disconnected');
-          // agenda reconexão com backoff controlado
           reconnectionAttempts[sessionId] = (reconnectionAttempts[sessionId] || 0) + 1;
           const maxAttempts = 3;
           if (reconnectionAttempts[sessionId] <= maxAttempts) {
-            const delay = 2000 * reconnectionAttempts[sessionId]; // 2s,4s,6s
+            const delay = 2000 * reconnectionAttempts[sessionId];
             console.log(`[Sessão ${sessionId}] Tentativa de reconexão em ${delay}ms (tentativa ${reconnectionAttempts[sessionId]}/${maxAttempts}).`);
-            // garante que não haja inicialização concorrente
             if (!initializingLocks[sessionId]) {
               setTimeout(() => {
                 initializeWhatsAppClient(sessionId).catch(e => console.error(`[Sessão ${sessionId}] Erro ao reconectar depois de desconexão:`, e));
@@ -327,13 +306,11 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
             return;
           } else {
             console.log(`[Sessão ${sessionId}] Ultrapassou tentativas de reconexão (${maxAttempts}). Requer intervenção manual.`);
-            // não remove auth automaticamente, mas limpa client local para poder reiniciar manualmente
             await cleanupSession(sessionId, false);
             return;
           }
         }
 
-        // Razões destrutivas exigem limpeza completa
         const destructiveReasons = ['AUTHENTICATION_FAILED', 'CHANGE_IN_CACHE', 'UNPAIRED', 'MULTI_DEVICE_LOGOUT'];
         if (destructiveReasons.includes(reason)) {
           console.log(`[Sessão ${sessionId}] Motivo destrutivo (${reason}) - realizando limpeza com remoção de auth.`);
@@ -341,7 +318,6 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
         } else {
           console.log(`[Sessão ${sessionId}] Desconexão não destrutiva (${reason}). Limpando instância do cliente para futura reconexão.`);
           try {
-            // apenas destrói a instância, preserva auth (arquivos)
             if (sessions[sessionId] && sessions[sessionId].client) {
               try { sessions[sessionId].client.removeAllListeners(); } catch(_) {}
               try { await sessions[sessionId].client.destroy(); } catch(_) {}
@@ -366,20 +342,16 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
     });
 
-    // inicializa com timeout e retries leves
     const MAX_INIT_ATTEMPTS = 2;
     let attempt = 0;
     while (attempt < MAX_INIT_ATTEMPTS) {
       attempt++;
       try {
         console.log(`[Sessão ${sessionId}] 🚀 Inicializando cliente (tentativa ${attempt}/${MAX_INIT_ATTEMPTS})...`);
-        // aguarda initialize; se falhar entra no catch e tenta novamente
         await client.initialize();
-        // se inicializou sem lançar, retorna a sessão
         return sessions[sessionId];
       } catch (err) {
         console.error(`[Sessão ${sessionId}] ❌ Erro na inicialização (tentativa ${attempt}):`, err && err.message ? err.message : err);
-        // se erro crítico do puppeteer (target fechado), tenta destruir e re-criar
         try { client.removeAllListeners(); } catch(_) {}
         try { await client.destroy(); } catch(_) {}
         delete sessions[sessionId];
@@ -403,7 +375,6 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
     const res = await initPromise;
     return res;
   } finally {
-    // limpa a promessa ativa para permitir futuras inicializações se necessário
     delete activeInitializations[sessionId];
   }
 };
@@ -454,51 +425,40 @@ app.get('/api/whatsapp/qr/:sessionId', async (req, res) => {
   }
 });
 
+// Rota start atualizada: não seta lock aqui — initializeWhatsAppClient gerencia locks
 app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
-  console.log(`[Sessão ${sessionId}] 📥 Recebida requisição para iniciar.`);
+
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  const forwardedFor = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress || 'unknown';
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  console.log(`[${requestId}] [Sessão ${sessionId}] 📥 Recebida requisição para iniciar. from=${forwardedFor} ua="${userAgent}"`);
 
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
-  const snapshot = await get(sessionRef);
-  const firebaseStatus = snapshot.exists() ? snapshot.val().status : 'disconnected';
+  let snapshot;
+  try { snapshot = await get(sessionRef); } catch (err) { snapshot = null; }
+  const firebaseStatus = snapshot && snapshot.exists() ? snapshot.val().status : 'disconnected';
 
-  // Se já está ready no firebase, ignora
   if (firebaseStatus === 'ready') {
-    console.log(`[Sessão ${sessionId}] ✅ Status 'ready' encontrado no Firebase. Requisição ignorada.`);
+    console.log(`[${requestId}] [Sessão ${sessionId}] ✅ Status 'ready' no Firebase. Ignorando start.`);
     return res.status(200).json({ success: true, message: 'Sessão já está conectada (Status Firebase: ready).' });
   }
 
-  // espera se já existe inicialização em andamento
-  if (initializingLocks[sessionId]) {
-    console.log(`[Sessão ${sessionId}] ⚠️ Sessão já está sendo inicializada. Requisição bloqueada.`);
-    return res.status(409).json({
-      success: false,
-      message: 'A sessão já está em processo de inicialização. Por favor, aguarde.',
-    });
+  if (activeInitializations[sessionId]) {
+    console.log(`[${requestId}] [Sessão ${sessionId}] 🔁 Inicialização já em andamento - vinculando à promessa existente.`);
+    return res.status(202).json({ success: true, message: 'Sessão em inicialização. Aguarde (já existe uma inicialização em andamento).' });
   }
 
-  // ativa lock local e dispara inicialização (não bloqueante)
-  initializingLocks[sessionId] = true;
-  console.log(`[Sessão ${sessionId}] 🔒 Lock de inicialização ativado.`);
-
-  try {
-    // Chama inicialização e aguarda para poder dar resposta inicial (mas sem travar indefinidamente)
-    initializeWhatsAppClient(sessionId).then(() => {
-      console.log(`[Sessão ${sessionId}] Inicialização concluída (promessa resolvida).`);
-    }).catch(err => {
-      console.error(`[Sessão ${sessionId}] ❌ Falha não capturada na inicialização:`, err);
+  console.log(`[${requestId}] [Sessão ${sessionId}] 🔔 Iniciando initializeWhatsAppClient...`);
+  // dispara a inicialização assincronamente; initializeWhatsAppClient fará o set do lock
+  initializeWhatsAppClient(sessionId)
+    .then(() => console.log(`[${requestId}] [Sessão ${sessionId}] Inicialização concluída (promessa resolvida).`))
+    .catch(err => {
+      console.error(`[${requestId}] [Sessão ${sessionId}] ❌ Falha na inicialização:`, err && err.message ? err.message : err);
       if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
     });
 
-    res.status(202).json({
-      success: true,
-      message: `Inicialização da sessão ${sessionId} iniciada.`,
-    });
-  } catch (err) {
-    if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
-    console.error(`[Sessão ${sessionId}] Erro ao iniciar sessão:`, err);
-    res.status(500).json({ success: false, message: 'Erro ao iniciar sessão.' });
-  }
+  return res.status(202).json({ success: true, message: 'Inicialização iniciada — aguarde o QR Code.', requestId });
 });
 
 app.post('/api/whatsapp/stop/:sessionId', async (req, res) => {
@@ -508,9 +468,7 @@ app.post('/api/whatsapp/stop/:sessionId', async (req, res) => {
   if (session && session.client) {
     console.log(`[Sessão ${sessionId}] 🛑 Recebida requisição para parar.`);
     try {
-      // Chama logout e força remoção completa
       await session.client.logout();
-      // cleanup com remoção do auth
       await cleanupSession(sessionId, true);
       res.status(200).json({ success: true, message: `Sessão ${sessionId} desconectada.` });
     } catch (error) {
@@ -530,14 +488,11 @@ app.post('/api/config/update/:sessionId', async (req, res) => {
   if (!newConfig || Object.keys(newConfig).length === 0) {
     return res.status(400).json({ success: false, error: 'Nenhum dado fornecido.' });
   }
-  
   try {
     const configRef = ref(database, `tenants/${sessionId}/whatsappConfig`);
     await set(configRef, newConfig);
-
     delete sessionModels[sessionId];
     Object.keys(userChats).forEach(chatId => { delete userChats[chatId]; });
-    
     console.log(`[Sessão ${sessionId}] ⚙️ Configurações atualizadas.`);
     res.status(200).json({ success: true, message: 'Configurações atualizadas.' });
   } catch (error) {
