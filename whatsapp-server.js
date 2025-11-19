@@ -66,7 +66,7 @@ app.use(cors({
       callback(null, true);
     } else {
       console.log(`[CORS] Origem bloqueada: ${origin}`);
-      callback(new Error('Não permitido pelo CORS'));
+      callback(new Error('Not allowed by CORS'));
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -84,8 +84,7 @@ app.use(express.json());
 // --- ARMAZENAMENTO DE SESSÕES ---
 const sessions = {};
 const sessionModels = {}; // Armazena o modelo de IA base por sessão.
-const sessionConfigs = {}; // Armazena a última configuração usada para o modelo.
-const userChats = {}; // Armazena as conversas ativas: userChats[sessionId][chatId]
+const userChats = {}; // Armazena as conversas ativas por usuário (chatId).
 const initializingLocks = {}; // Previne múltiplas inicializações simultâneas
 
 // --- FUNÇÕES AUXILIARES ---
@@ -100,7 +99,7 @@ const createSystemInstruction = (config) => `
   - Link do Cardápio e Pedidos: ${config.menuUrl || 'Não informado'}
   - Telefone de contato: ${config.phoneNumber || 'Não informado'}
   IMPORTANTE: Ao enviar o link do cardápio, envie apenas a URL, sem formatação de link ou markdown. Por exemplo: https://seusite.com/cardapio
-  NUNCA invente informações. Se não souber algo, diga algo como: "Opa, essa pergunta me pegou! 😬 Vou chamar um humano pra te ajudar, só um minutinho! 🧑‍🍳"
+  NUNCA invente informações. Se não souber algo, diga algo como: "Opa, essa pergunta me pegou! Vou chamar um humano pra te ajudar, só um minutinho! 🧑‍🍳"
 `;
 
 const initializeWhatsAppClient = async (sessionId) => {
@@ -139,16 +138,13 @@ const initializeWhatsAppClient = async (sessionId) => {
   client.on('qr', async (qr) => {
     const sessionRef = ref(database, `tenants/${sessionId}/session`);
     const snapshot = await get(sessionRef);
-    const firebaseSessionData = snapshot.exists() ? snapshot.val() : {};
+    const firebaseStatus = snapshot.exists() ? snapshot.val().status : 'disconnected';
 
-    // LÓGICA DE PREVENÇÃO DE QR DESNECESSÁRIO
-    // Se a sessão já foi autenticada com sucesso antes (marcador 'authenticatedOnce')
-    // ou se o status no Firebase é 'ready', não geramos um novo QR code.
-    // Isso previne que uma pequena instabilidade de rede que gere um evento 'qr'
-    // force o usuário a escanear novamente sem necessidade.
-    if (firebaseSessionData.authenticatedOnce || firebaseSessionData.status === 'ready') {
-      console.log(`[Sessão ${sessionId}] ⚠️ Evento 'qr' recebido, mas uma sessão autenticada já existe. Ignorando a geração de um novo QR Code para permitir a reconexão automática.`);
-      return; // Ignora a geração do QR Code
+    // Se o status no Firebase for 'ready', significa que a sessão está conectada.
+    // Ignoramos o evento 'qr' para evitar a geração desnecessária de um novo código.
+    if (firebaseStatus === 'ready') {
+      console.log(`[Sessão ${sessionId}] ⚠️ Evento 'qr' recebido, mas sessão já está 'ready' no Firebase. Ignorando geração de QR Code.`);
+      return;
     }
 
     // Incrementa o contador de tentativas
@@ -172,8 +168,6 @@ const initializeWhatsAppClient = async (sessionId) => {
     
     try {
       const qrUrl = await qrcode.toDataURL(qr);
-      // Ao gerar um QR, o status é atualizado. O marcador 'authenticatedOnce' será removido
-      // e apenas definido como 'true' novamente no evento 'ready'.
       await set(sessionRef, { status: 'QR_CODE', qr: qrUrl, attempt: sessions[sessionId].qrAttempts });
       sessions[sessionId].status = 'QR_CODE';
     } catch (error) {
@@ -184,11 +178,7 @@ const initializeWhatsAppClient = async (sessionId) => {
   // Evento Ready
   client.on('ready', async () => {
     console.log(`[Sessão ${sessionId}] ✅ Cliente conectado e pronto!`);
-    await set(sessionRef, { 
-      status: 'ready', 
-      conectadoEm: new Date().toISOString(),
-      authenticatedOnce: true // Marca que a autenticação já foi bem-sucedida uma vez.
-    });
+    await set(sessionRef, { status: 'ready', connectedAt: new Date().toISOString() });
     sessions[sessionId].status = 'ready';
     sessions[sessionId].qrAttempts = 0;
     delete initializingLocks[sessionId];
@@ -206,13 +196,6 @@ const initializeWhatsAppClient = async (sessionId) => {
   client.on('message', async (message) => {
     if (message.fromMe) return;
 
-    // 1. VALIDAÇÃO DA MENSAGEM RECEBIDA
-    // Ignora mensagens vazias ou que contenham apenas espaços em branco.
-    if (!message.body || message.body.trim() === '') {
-      console.log(`[Sessão ${sessionId}] 📩 Mensagem vazia recebida de ${message.from}. Ignorando.`);
-      return;
-    }
-
     console.log(`[Sessão ${sessionId}] 📩 Mensagem de ${message.from}: "${message.body}"`);
     const chatId = message.from;
 
@@ -221,88 +204,50 @@ const initializeWhatsAppClient = async (sessionId) => {
       const snapshot = await get(configRef);
       const config = snapshot.exists() ? snapshot.val() : {};
 
-      console.log('--- INÍCIO DEBUG FIREBASE ---');
-      console.log(`[Sessão ${sessionId}] Buscando configuração em: tenants/${sessionId}/whatsappConfig`);
-      if (snapshot.exists()) {
-        console.log(`[Sessão ${sessionId}] DADOS ENCONTRADOS NO FIREBASE:`, JSON.stringify(config, null, 2));
-      } else {
-        console.log(`[Sessão ${sessionId}] NENHUM DADO ENCONTRADO em tenants/${sessionId}/whatsappConfig. Usando config vazia.`);
-      }
-      console.log('--- FIM DEBUG FIREBASE ---');
-
       if (!config.isActive) {
         console.log(`[Sessão ${sessionId}] Assistente desativado. Ignorando.`);
         return;
       }
 
-      // Compara a configuração atual com a última usada para esta sessão.
-      const configChanged = JSON.stringify(config) !== JSON.stringify(sessionConfigs[sessionId]);
-
       // 1. Garante que o modelo de IA base para a sessão (tenant) exista e esteja atualizado.
-      if (!sessionModels[sessionId] || configChanged) {
-        if (configChanged) {
-          console.log(`[Sessão ${sessionId}] ⚙️ Detectada mudança na configuração. Recriando modelo de IA e limpando chats.`);
-          // Limpa os chats da sessão para forçar a recriação com o novo modelo.
-          delete userChats[sessionId];
-        } else {
-          console.log(`[Sessão ${sessionId}] Criando/Recriando modelo de IA com novas instruções.`);
-        }
-        
+      if (!sessionModels[sessionId]) {
+        console.log(`[Sessão ${sessionId}] Criando/Recriando modelo de IA com novas instruções.`);
         const systemInstruction = createSystemInstruction(config);
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash";
         const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
-        
         sessionModels[sessionId] = model;
-        sessionConfigs[sessionId] = config; // Armazena a configuração usada.
       }
 
-      // 2. Garante que a estrutura de chat para a sessão exista.
-      if (!userChats[sessionId]) {
-        userChats[sessionId] = {};
-      }
-
-      // 3. Inicia ou reutiliza a sessão de chat para o usuário específico dentro da sessão do tenant.
-      if (!userChats[sessionId][chatId]) {
+      // 2. Inicia ou reutiliza a sessão de chat para o usuário específico.
+      if (!userChats[chatId]) {
         console.log(`[Sessão ${sessionId}] Iniciando novo chat para o usuário ${chatId}.`);
-        userChats[sessionId][chatId] = sessionModels[sessionId].startChat({ history: [] });
+        userChats[chatId] = sessionModels[sessionId].startChat({ history: [] });
       }
 
-      const chat = userChats[sessionId][chatId];
+      const chat = userChats[chatId];
       const result = await chat.sendMessage(message.body);
       const response = await result.response;
+      const text = response.text();
       
-      // 2. VALIDAÇÃO DA RESPOSTA DA IA
-      // Garante que a resposta da IA é uma string válida antes de enviar.
-      const text = response.text()?.trim();
-
-      if (text) {
-        console.log(`[Sessão ${sessionId}] 🤖 Resposta: "${text.substring(0, 50)}..."`);
-        try {
-          await client.sendMessage(message.from, text);
-        } catch (replyError) {
-          console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar a resposta da IA. Fallback. Erro:`, replyError);
-          try {
-            await client.sendMessage(message.from, 'Opa, tive um probleminha para responder. Pode tentar de novo?');
-          } catch (fallbackError) {
-            console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar a mensagem de fallback após falha inicial. Erro:`, fallbackError);
-          }
-        }
-      } else {
-        console.warn(`[Sessão ${sessionId}] ⚠️ A IA não retornou uma resposta válida para "${message.body}". Enviando fallback.`);
-        try {
-          await client.sendMessage(message.from, 'Não entendi, pode repetir? 🤔');
-        } catch (replyError) {
-          console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar a mensagem de fallback de IA inválida. Erro:`, replyError);
-        }
+      console.log(`[Sessão ${sessionId}] 🤖 Resposta: "${text.substring(0, 50)}..."`);
+      
+      // Novo bloco try-catch para isolar o erro de envio de mensagem (Evaluation failed: t)
+      try {
+        await message.reply(text);
+      } catch (replyError) {
+        console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar resposta (message.reply):`, replyError);
+        // Não faz nada, apenas registra o erro para evitar que o processo caia.
+        // O erro "Evaluation failed: t" geralmente significa que o cliente desconectou.
       }
 
     } catch (error) {
-      console.error(`[Sessão ${sessionId}] ❌ Erro ao processar mensagem:`, error);
+      console.error(`[Sessão ${sessionId}] ❌ Erro ao processar mensagem (IA):`, error);
+      // Se a IA falhar, tentamos enviar uma mensagem de erro ao usuário.
       try {
-        await client.sendMessage(message.from, 'Desculpe, não consegui processar sua solicitação no momento. 😔');
-      } catch (finalFallbackError) {
-        console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar a mensagem de erro final. Erro:`, finalFallbackError);
+        await message.reply('Desculpe, não consegui processar sua solicitação no momento. 😔');
+      } catch (finalReplyError) {
+        console.error(`[Sessão ${sessionId}] ❌ Erro crítico ao enviar mensagem de falha:`, finalReplyError);
       }
     }
   });
@@ -311,14 +256,18 @@ const initializeWhatsAppClient = async (sessionId) => {
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão: ${reason}`);
     
-    // Razões que forçam a remoção da autenticação e exigem novo QR code.
-    const destructiveReasons = ['AUTHENTICATION_FAILED', 'CHANGE_IN_CACHE', 'UNPAIRED', 'LOGOUT'];
+    const destructiveReasons = ['AUTHENTICATION_FAILED', 'CHANGE_IN_CACHE', 'UNPAIRED'];
+    const sessionRef = ref(database, `tenants/${sessionId}/session`);
     
+    // Atualiza o status no Firebase para 'disconnected'
+    await set(sessionRef, { status: 'disconnected' });
+
+    // Razões que forçam a remoção da autenticação e exigem novo QR code.
     if (destructiveReasons.includes(reason)) {
         console.log(`[Sessão ${sessionId}] O motivo da desconexão (${reason}) requer limpeza completa da sessão. Limpando...`);
         await cleanupSession(sessionId, true); // Força a remoção da pasta de autenticação
     } else {
-        // Para outras desconexões não destrutivas.
+        // 'LOGOUT' e outras desconexões não destrutivas (como 'DISCONNECTED' por instabilidade).
         // Apenas destrói a instância do cliente, mas mantém os arquivos de autenticação.
         // Isso permite uma reconexão rápida sem precisar escanear o QR code novamente.
         console.log(`[Sessão ${sessionId}] Desconexão não destrutiva (${reason}). Limpando instância do cliente para futura reconexão.`);
@@ -436,7 +385,7 @@ app.get('/api/whatsapp/status/:sessionId', async (req, res) => {
     const snapshot = await get(statusRef);
     const status = snapshot.exists() ? snapshot.val() : 'disconnected';
     res.json({ status });
-  } catch (error) { 
+  } catch (error) {
     console.error(`[Status ${sessionId}] Erro:`, error);
     res.status(500).json({ status: 'disconnected', message: 'Erro ao buscar status.' });
   }
@@ -473,7 +422,7 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
 
   if (firebaseStatus === 'ready') {
     console.log(`[Sessão ${sessionId}] ✅ Status 'ready' encontrado no Firebase. Requisição ignorada.`);
-    return res.status(200).json({ success: true, message: 'A sessão já está conectada (Status Firebase: ready).' });
+    return res.status(200).json({ success: true, message: 'Sessão já está conectada (Status Firebase: ready).' });
   }
 
   // 2. Verifica o status na memória local
@@ -484,14 +433,14 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
         const state = await existingSession.client.getState();
         if (state === 'CONNECTED') {
           console.log(`[Sessão ${sessionId}] ✅ Cliente já conectado e pronto. Requisição ignorada.`);
-          return res.status(200).json({ success: true, message: 'A sessão já está conectada.' });
+          return res.status(200).json({ success: true, message: 'Sessão já está conectada.' });
         }
       } catch (e) {
         console.log(`[Sessão ${sessionId}] ⚠️ Cliente em estado 'ready' mas inacessível: ${e.message}. Prosseguindo para reiniciar.`);
         await cleanupSession(sessionId, false); // Limpa a sessão corrompida antes de continuar.
       }
     }
-    // Se a sessão já está inicializando (gerando QR ou conectando), informa o cliente para aguardar.
+    // Se a sessão já está inicializando (gerando QR ou conectando), informa o usuário para aguardar.
     else if (['INITIALIZING', 'QR_CODE'].includes(existingSession.status)) {
       console.log(`[Sessão ${sessionId}] ⏳ Sessão já em andamento com status '${existingSession.status}'. Requisição ignorada.`);
       return res.status(202).json({ success: true, message: 'Sessão já está em processo de inicialização. Aguarde.' });
@@ -537,13 +486,13 @@ app.post('/api/whatsapp/stop/:sessionId', async (req, res) => {
     console.log(`[Sessão ${sessionId}] 🛑 Recebida requisição para parar.`);
     try {
       await session.client.logout();
-      res.status(200).json({ success: true, message: `Sessão ${sessionId} desconectada com sucesso.` });
+      res.status(200).json({ success: true, message: `Sessão ${sessionId} desconectada.` });
     } catch (error) {
       console.error(`[Sessão ${sessionId}] Erro ao fazer logout:`, error);
       res.status(500).json({ success: false, error: 'Erro ao desconectar.' });
     }
   } else {
-    await remove(ref(database, `tenants/${sessionId}/session`));
+    await set(ref(database, `tenants/${sessionId}/session/status`), 'disconnected');
     res.status(404).json({ success: false, error: `Sessão ${sessionId} não encontrada ou já inativa.` });
   }
 });
@@ -553,7 +502,7 @@ app.post('/api/config/update/:sessionId', async (req, res) => {
   const newConfig = req.body;
 
   if (!newConfig || Object.keys(newConfig).length === 0) {
-    return res.status(400).json({ success: false, error: 'Nenhum dado de configuração foi fornecido.' });
+    return res.status(400).json({ success: false, error: 'Nenhum dado fornecido.' });
   }
   
   try {
@@ -568,7 +517,7 @@ app.post('/api/config/update/:sessionId', async (req, res) => {
     });
     
     console.log(`[Sessão ${sessionId}] ⚙️ Configurações atualizadas.`);
-    res.status(200).json({ success: true, message: 'Configurações atualizadas com sucesso.' });
+    res.status(200).json({ success: true, message: 'Configurações atualizadas.' });
   } catch (error) {
     console.error(`[Config ${sessionId}] Erro ao salvar:`, error);
     res.status(500).json({ success: false, error: 'Erro ao salvar a configuração.' });
