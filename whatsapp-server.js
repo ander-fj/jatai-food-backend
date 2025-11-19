@@ -136,6 +136,17 @@ const initializeWhatsAppClient = async (sessionId) => {
 
   // Evento QR Code
   client.on('qr', async (qr) => {
+    const sessionRef = ref(database, `tenants/${sessionId}/session`);
+    const snapshot = await get(sessionRef);
+    const firebaseStatus = snapshot.exists() ? snapshot.val().status : 'disconnected';
+
+    // Se o status no Firebase for 'ready', significa que a sessão está conectada.
+    // Ignoramos o evento 'qr' para evitar a geração desnecessária de um novo código.
+    if (firebaseStatus === 'ready') {
+      console.log(`[Sessão ${sessionId}] ⚠️ Evento 'qr' recebido, mas sessão já está 'ready' no Firebase. Ignorando geração de QR Code.`);
+      return;
+    }
+
     // Incrementa o contador de tentativas
     sessions[sessionId].qrAttempts++;
     
