@@ -284,14 +284,14 @@ const initializeWhatsAppClient = async (sessionId) => {
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão: ${reason}`);
     
-    const destructiveReasons = ['AUTHENTICATION_FAILED', 'CHANGE_IN_CACHE', 'UNPAIRED'];
-    
     // Razões que forçam a remoção da autenticação e exigem novo QR code.
+    const destructiveReasons = ['AUTHENTICATION_FAILED', 'CHANGE_IN_CACHE', 'UNPAIRED', 'LOGOUT'];
+    
     if (destructiveReasons.includes(reason)) {
         console.log(`[Sessão ${sessionId}] O motivo da desconexão (${reason}) requer limpeza completa da sessão. Limpando...`);
         await cleanupSession(sessionId, true); // Força a remoção da pasta de autenticação
     } else {
-        // Para 'LOGOUT' e outras desconexões não destrutivas.
+        // Para outras desconexões não destrutivas.
         // Apenas destrói a instância do cliente, mas mantém os arquivos de autenticação.
         // Isso permite uma reconexão rápida sem precisar escanear o QR code novamente.
         console.log(`[Sessão ${sessionId}] Desconexão não destrutiva (${reason}). Limpando instância do cliente para futura reconexão.`);
