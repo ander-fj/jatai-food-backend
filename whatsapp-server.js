@@ -255,20 +255,28 @@ const initializeWhatsAppClient = async (sessionId) => {
           await message.reply(text);
         } catch (replyError) {
           console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar a resposta da IA. Fallback. Erro:`, replyError);
-          await message.reply('Opa, tive um probleminha para responder. Pode tentar de novo?');
+          try {
+            await message.reply('Opa, tive um probleminha para responder. Pode tentar de novo?');
+          } catch (fallbackError) {
+            console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar a mensagem de fallback após falha inicial. Erro:`, fallbackError);
+          }
         }
       } else {
         console.warn(`[Sessão ${sessionId}] ⚠️ A IA não retornou uma resposta válida para "${message.body}". Enviando fallback.`);
         try {
           await message.reply('Não entendi, pode repetir? 🤔');
         } catch (replyError) {
-          console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar a mensagem de fallback. Erro:`, replyError);
+          console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar a mensagem de fallback de IA inválida. Erro:`, replyError);
         }
       }
 
     } catch (error) {
       console.error(`[Sessão ${sessionId}] ❌ Erro ao processar mensagem:`, error);
-      await message.reply('Desculpe, não consegui processar sua solicitação no momento. 😔');
+      try {
+        await message.reply('Desculpe, não consegui processar sua solicitação no momento. 😔');
+      } catch (finalFallbackError) {
+        console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar a mensagem de erro final. Erro:`, finalFallbackError);
+      }
     }
   });
 
