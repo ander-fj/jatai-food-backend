@@ -184,13 +184,13 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
             '--disable-gpu',
-            '--single-process',
-            '--disable-background-timer-throttling',
-            '--disable-renderer-backgrounding'
+            '--disable-software-rasterizer',
+            '--disable-extensions',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-blink-features=AutomationControlled'
           ],
           headless: true,
         },
@@ -287,7 +287,24 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
         console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão: ${reason}`);
 
         if (!reason) reason = 'UNKNOWN';
-        if (reason === 'LOGOUT' || reason.toUpperCase().includes('CONNECTION')) {
+        
+        // LOGOUT é SEMPRE destrutivo - requer nova autenticação
+        if (reason === 'LOGOUT') {
+          console.log(`[Sessão ${sessionId}] 🔴 LOGOUT detectado - limpeza completa necessária.`);
+          await cleanupSession(sessionId, true); // remove autenticação
+          await set(sessionRef, { 
+            status: 'logged_out', 
+            lastReason: reason, 
+            disconnectedAt: new Date().toISOString(),
+            requiresReauth: true 
+          });
+          reconnectionAttempts[sessionId] = 0;
+          if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
+          return; // NÃO tenta reconectar automaticamente
+        }
+        
+        // Apenas CONNECTION_LOST e similares são transitórios
+        if (reason.toUpperCase().includes('CONNECTION') || reason === 'NAVIGATION') {
           console.log(`[Sessão ${sessionId}] ⚠️ Motivo '${reason}' tratado como desconexão transitória (não destrutiva).`);
           await set(sessionRef, { status: 'disconnected', lastReason: reason, disconnectedAt: new Date().toISOString() });
           sessions[sessionId] && (sessions[sessionId].status = 'disconnected');
@@ -439,9 +456,24 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   try { snapshot = await get(sessionRef); } catch (err) { snapshot = null; }
   const firebaseStatus = snapshot && snapshot.exists() ? snapshot.val().status : 'disconnected';
 
-  if (firebaseStatus === 'ready') {
-    console.log(`[${requestId}] [Sessão ${sessionId}] ✅ Status 'ready' no Firebase. Ignorando start.`);
-    return res.status(200).json({ success: true, message: 'Sessão já está conectada (Status Firebase: ready).' });
+  // Verificar TANTO Firebase QUANTO memória
+  if (firebaseStatus === 'ready' && sessions[sessionId]) {
+    try {
+      const state = await sessions[sessionId].client.getState();
+      if (state === 'CONNECTED') {
+        console.log(`[${requestId}] [Sessão ${sessionId}] ✅ Cliente realmente conectado.`);
+        return res.status(200).json({ success: true, message: 'Sessão já conectada.' });
+      } else {
+        console.log(`[${requestId}] [Sessão ${sessionId}] ⚠️ Firebase diz 'ready' mas cliente está ${state}. Reiniciando.`);
+        await cleanupSession(sessionId, false);
+      }
+    } catch (e) {
+      console.log(`[${requestId}] [Sessão ${sessionId}] ⚠️ Erro ao verificar estado: ${e.message}. Reiniciando.`);
+      await cleanupSession(sessionId, false);
+    }
+  } else if (firebaseStatus === 'ready' && !sessions[sessionId]) {
+    console.log(`[${requestId}] [Sessão ${sessionId}] ⚠️ Firebase diz 'ready' mas sessão não existe em memória. Reiniciando.`);
+    await cleanupSession(sessionId, false);
   }
 
   if (activeInitializations[sessionId]) {
