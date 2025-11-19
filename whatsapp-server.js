@@ -384,22 +384,41 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
   console.log(`[Sessão ${sessionId}] 📥 Recebida requisição para iniciar.`);
 
-  // Otimização: Verifica se a sessão já está pronta e conectada.
-  if (sessions[sessionId]?.status === 'ready') {
-    try {
-      const state = await sessions[sessionId].client.getState();
-      if (state === 'CONNECTED') {
-        console.log(`[Sessão ${sessionId}] ✅ Cliente já conectado e pronto. Requisição ignorada.`);
-        return res.status(200).json({ success: true, message: 'Sessão já está conectada.' });
-      }
-      console.log(`[Sessão ${sessionId}] ⚠️ Cliente em estado 'ready' mas não conectado ('${state}'). Tentando reiniciar.`);
-    } catch (e) {
-      console.log(`[Sessão ${sessionId}] ⚠️ Cliente em estado 'ready' mas inacessível: ${e.message}. Prosseguindo para reiniciar.`);
-      // Limpa a sessão corrompida antes de continuar
-      await cleanupSession(sessionId, false);
-    }
+  // Verificação robusta para evitar reinicializações desnecessárias.
+  const existingSession = sessions[sessionId];
+  
+  // 1. Verifica o status no Firebase (fonte de verdade persistente)
+  const sessionRef = ref(database, `tenants/${sessionId}/session`);
+  const snapshot = await get(sessionRef);
+  const firebaseStatus = snapshot.exists() ? snapshot.val().status : 'disconnected';
+
+  if (firebaseStatus === 'ready') {
+    console.log(`[Sessão ${sessionId}] ✅ Status 'ready' encontrado no Firebase. Requisição ignorada.`);
+    return res.status(200).json({ success: true, message: 'Sessão já está conectada (Status Firebase: ready).' });
   }
 
+  // 2. Verifica o status na memória local
+  if (existingSession) {
+    // Se a sessão está pronta e conectada, ignora a requisição.
+    if (existingSession.status === 'ready') {
+      try {
+        const state = await existingSession.client.getState();
+        if (state === 'CONNECTED') {
+          console.log(`[Sessão ${sessionId}] ✅ Cliente já conectado e pronto. Requisição ignorada.`);
+          return res.status(200).json({ success: true, message: 'Sessão já está conectada.' });
+        }
+      } catch (e) {
+        console.log(`[Sessão ${sessionId}] ⚠️ Cliente em estado 'ready' mas inacessível: ${e.message}. Prosseguindo para reiniciar.`);
+        await cleanupSession(sessionId, false); // Limpa a sessão corrompida antes de continuar.
+      }
+    }
+    // Se a sessão já está inicializando (gerando QR ou conectando), informa o usuário para aguardar.
+    else if (['INITIALIZING', 'QR_CODE'].includes(existingSession.status)) {
+      console.log(`[Sessão ${sessionId}] ⏳ Sessão já em andamento com status '${existingSession.status}'. Requisição ignorada.`);
+      return res.status(202).json({ success: true, message: 'Sessão já está em processo de inicialização. Aguarde.' });
+    }
+  }
+  
   // Bloqueia múltiplas inicializações concorrentes.
   if (initializingLocks[sessionId]) {
     console.log(`[Sessão ${sessionId}] ⚠️ Sessão já está sendo inicializada. Requisição bloqueada.`);
