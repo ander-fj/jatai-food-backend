@@ -84,7 +84,8 @@ app.use(express.json());
 // --- ARMAZENAMENTO DE SESSÕES ---
 const sessions = {};
 const sessionModels = {}; // Armazena o modelo de IA base por sessão.
-const userChats = {}; // Armazena as conversas ativas por usuário (chatId).
+const sessionConfigs = {}; // Armazena a última configuração usada para o modelo.
+const userChats = {}; // Armazena as conversas ativas: userChats[sessionId][chatId]
 const initializingLocks = {}; // Previne múltiplas inicializações simultâneas
 
 // --- FUNÇÕES AUXILIARES ---
@@ -146,7 +147,7 @@ const initializeWhatsAppClient = async (sessionId) => {
     // Isso previne que uma pequena instabilidade de rede que gere um evento 'qr'
     // force o usuário a escanear novamente sem necessidade.
     if (firebaseSessionData.authenticatedOnce || firebaseSessionData.status === 'ready') {
-      console.log(`[Sessão ${sessionId}] ⚠️ Evento 'qr' recebido, mas a sessão já tem uma autenticação válida. Aguardando reconexão automática...`);
+      console.log(`[Sessão ${sessionId}] ⚠️ Evento 'qr' recebido, mas uma sessão autenticada já existe. Ignorando a geração de um novo QR Code para permitir a reconexão automática.`);
       return; // Ignora a geração do QR Code
     }
 
@@ -220,28 +221,54 @@ const initializeWhatsAppClient = async (sessionId) => {
       const snapshot = await get(configRef);
       const config = snapshot.exists() ? snapshot.val() : {};
 
+      console.log('--- INÍCIO DEBUG FIREBASE ---');
+      console.log(`[Sessão ${sessionId}] Buscando configuração em: tenants/${sessionId}/whatsappConfig`);
+      if (snapshot.exists()) {
+        console.log(`[Sessão ${sessionId}] DADOS ENCONTRADOS NO FIREBASE:`, JSON.stringify(config, null, 2));
+      } else {
+        console.log(`[Sessão ${sessionId}] NENHUM DADO ENCONTRADO em tenants/${sessionId}/whatsappConfig. Usando config vazia.`);
+      }
+      console.log('--- FIM DEBUG FIREBASE ---');
+
       if (!config.isActive) {
         console.log(`[Sessão ${sessionId}] Assistente desativado. Ignorando.`);
         return;
       }
 
+      // Compara a configuração atual com a última usada para esta sessão.
+      const configChanged = JSON.stringify(config) !== JSON.stringify(sessionConfigs[sessionId]);
+
       // 1. Garante que o modelo de IA base para a sessão (tenant) exista e esteja atualizado.
-      if (!sessionModels[sessionId]) {
-        console.log(`[Sessão ${sessionId}] Criando/Recriando modelo de IA com novas instruções.`);
+      if (!sessionModels[sessionId] || configChanged) {
+        if (configChanged) {
+          console.log(`[Sessão ${sessionId}] ⚙️ Detectada mudança na configuração. Recriando modelo de IA e limpando chats.`);
+          // Limpa os chats da sessão para forçar a recriação com o novo modelo.
+          delete userChats[sessionId];
+        } else {
+          console.log(`[Sessão ${sessionId}] Criando/Recriando modelo de IA com novas instruções.`);
+        }
+        
         const systemInstruction = createSystemInstruction(config);
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash";
         const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
+        
         sessionModels[sessionId] = model;
+        sessionConfigs[sessionId] = config; // Armazena a configuração usada.
       }
 
-      // 2. Inicia ou reutiliza a sessão de chat para o usuário específico.
-      if (!userChats[chatId]) {
+      // 2. Garante que a estrutura de chat para a sessão exista.
+      if (!userChats[sessionId]) {
+        userChats[sessionId] = {};
+      }
+
+      // 3. Inicia ou reutiliza a sessão de chat para o usuário específico dentro da sessão do tenant.
+      if (!userChats[sessionId][chatId]) {
         console.log(`[Sessão ${sessionId}] Iniciando novo chat para o usuário ${chatId}.`);
-        userChats[chatId] = sessionModels[sessionId].startChat({ history: [] });
+        userChats[sessionId][chatId] = sessionModels[sessionId].startChat({ history: [] });
       }
 
-      const chat = userChats[chatId];
+      const chat = userChats[sessionId][chatId];
       const result = await chat.sendMessage(message.body);
       const response = await result.response;
       
