@@ -232,23 +232,21 @@ const initializeWhatsAppClient = async (sessionId) => {
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão: ${reason}`);
     
-    // Razões que exigem a remoção completa da autenticação para forçar um novo QR code.
     const destructiveReasons = ['AUTHENTICATION_FAILED', 'CHANGE_IN_CACHE', 'UNPAIRED'];
     
-    // O logout (desconexão pelo celular, por exemplo) não deve remover a autenticação.
-    // Isso permite que o sistema tente reconectar automaticamente sem precisar de um novo QR code.
-    if (reason === 'LOGOUT') {
-        console.log(`[Sessão ${sessionId}] Desconexão por logout. A sessão será encerrada, mas os dados de autenticação serão mantidos para tentar uma reconexão automática.`);
-        await cleanupSession(sessionId, false); // NUNCA remova a autenticação em um logout simples.
-    } else if (destructiveReasons.includes(reason)) {
+    // Razões que forçam a remoção da autenticação e exigem novo QR code.
+    if (destructiveReasons.includes(reason)) {
         console.log(`[Sessão ${sessionId}] O motivo da desconexão (${reason}) requer limpeza completa da sessão. Limpando...`);
         await cleanupSession(sessionId, true); // Força a remoção da pasta de autenticação
     } else {
-        console.log(`[Sessão ${sessionId}] Desconexão não destrutiva (${reason}). Apenas limpando a instância do cliente para uma futura reconexão.`);
+        // Para 'LOGOUT' e outras desconexões não destrutivas.
+        // Apenas destrói a instância do cliente, mas mantém os arquivos de autenticação.
+        // Isso permite uma reconexão rápida sem precisar escanear o QR code novamente.
+        console.log(`[Sessão ${sessionId}] Desconexão não destrutiva (${reason}). Limpando instância do cliente para futura reconexão.`);
         await cleanupSession(sessionId, false); // Apenas destrói o cliente, mantém a autenticação
     }
     
-    // Remove o lock de inicialização
+    // Remove o lock de inicialização se existir
     if (initializingLocks[sessionId]) {
       console.log(`[Sessão ${sessionId}] 🔓 Lock de inicialização removido após desconexão.`);
       delete initializingLocks[sessionId];
