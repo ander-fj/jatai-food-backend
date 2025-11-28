@@ -107,12 +107,14 @@ const activeInitializations = {};
 const reconnectionAttempts = {};
 const startRequestTimestamps = {};
 const reconnectionTimers = {};
+const qrRegenerationTimers = {};
 
 // --- CONSTANTES ---
 const MAX_RECONNECTION_ATTEMPTS = 5;
 const RECONNECTION_DELAY = 5000; // 5 segundos
 const HEARTBEAT_INTERVAL = 30000; // 30 segundos
-const SESSION_TIMEOUT = 300000; // 5 minutos de inatividade
+const QR_REGENERATION_TIMEOUT = 120000; // 2 minutos - se QR for regenerado após ready, é logout
+const READY_TIMEOUT = 60000; // 1 minuto para atingir ready
 
 // --- SISTEMA IA ---
 const createSystemInstruction = (config) => `
@@ -153,6 +155,12 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   if (reconnectionTimers[sessionId]) {
     clearTimeout(reconnectionTimers[sessionId]);
     delete reconnectionTimers[sessionId];
+  }
+
+  // Limpar timers de regeneração de QR
+  if (qrRegenerationTimers[sessionId]) {
+    clearTimeout(qrRegenerationTimers[sessionId]);
+    delete qrRegenerationTimers[sessionId];
   }
 
   if (forceRemoveAuth) {
@@ -208,11 +216,31 @@ const attachLifecycleListeners = (client, sessionId) => {
     const qrUrl = await qrcode.toDataURL(qr);
 
     console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts}`);
-    await set(sessionRef, {
-      status: 'QR_CODE',
-      qr: qrUrl,
-      attempt: session.qrAttempts
-    });
+
+    // Se QR foi gerado APÓS a sessão estar ready, é um logout automático
+    if (session.status === 'ready') {
+      console.warn(`[Sessão ${sessionId}] ⚠️  QR regenerado após estar ready - Detectando logout automático`);
+      
+      // Aguardar um pouco para confirmar se é realmente um logout
+      if (qrRegenerationTimers[sessionId]) {
+        clearTimeout(qrRegenerationTimers[sessionId]);
+      }
+
+      qrRegenerationTimers[sessionId] = setTimeout(async () => {
+        const isValid = await isClientValid(sessionId);
+        if (!isValid) {
+          console.error(`[Sessão ${sessionId}] ❌ Confirmado: Logout automático detectado`);
+          await cleanupSession(sessionId, true);
+          await set(sessionRef, { status: 'logged_out', reason: 'auto_logout_detected' });
+        }
+      }, 3000); // Aguardar 3 segundos para confirmar
+    } else {
+      await set(sessionRef, {
+        status: 'QR_CODE',
+        qr: qrUrl,
+        attempt: session.qrAttempts
+      });
+    }
   });
 
   client.once('authenticated', () => {
@@ -230,6 +258,12 @@ const attachLifecycleListeners = (client, sessionId) => {
     // Iniciar heartbeat
     if (!sessions[sessionId].heartbeatInterval) {
       sessions[sessionId].heartbeatInterval = startHeartbeat(sessionId);
+    }
+
+    // Limpar timer de QR regeneração se existir
+    if (qrRegenerationTimers[sessionId]) {
+      clearTimeout(qrRegenerationTimers[sessionId]);
+      delete qrRegenerationTimers[sessionId];
     }
   });
 
@@ -326,6 +360,19 @@ const initializeWhatsAppClient = async (sessionId) => {
 
   activeInitializations[sessionId] = new Promise(async (resolve, reject) => {
     try {
+      // Verificar se já existe uma instância ativa
+      if (sessions[sessionId]?.client && await isClientValid(sessionId)) {
+        console.log(`[Sessão ${sessionId}] Cliente já está ativo, retornando sessão existente`);
+        resolve(sessions[sessionId]);
+        delete activeInitializations[sessionId];
+        return;
+      }
+
+      // Limpar sessão anterior se existir
+      if (sessions[sessionId]) {
+        await cleanupSession(sessionId, false);
+      }
+
       let client = new Client({
         authStrategy: new LocalAuth({
           clientId: sessionId,
@@ -333,7 +380,12 @@ const initializeWhatsAppClient = async (sessionId) => {
         }),
         puppeteer: {
           headless: true,
-          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage', // Evitar problemas de memória
+            '--disable-gpu', // Desabilitar GPU para estabilidade
+          ],
         }
       });
 
