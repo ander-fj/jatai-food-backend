@@ -11,8 +11,7 @@ const { getDatabase, ref, get, set, remove } = require('firebase/database');
 const fs = require('fs');
 const path = require('path');
 
-// --- CONFIGURAÇÃO DE SESSÃO PERSISTENTE (Render / servidores similares) ---
-// Tentativa de usar SESSION_PATH (se definido), senão tenta /var/data (quando disponível), por fim usa pasta dentro do projeto (__dirname)
+// --- CONFIGURAÇÃO DE SESSÃO PERSISTENTE ---
 let SESSION_BASE_PATH = process.env.SESSION_PATH || '/var/data/wwebjs_auth';
 let sessionPathResolved = SESSION_BASE_PATH;
 
@@ -21,7 +20,6 @@ const ensureDir = (p) => {
     if (!fs.existsSync(p)) {
       fs.mkdirSync(p, { recursive: true });
     }
-    // test write
     const testFile = path.join(p, `.writetest-${Date.now()}`);
     fs.writeFileSync(testFile, 'ok');
     fs.unlinkSync(testFile);
@@ -31,12 +29,11 @@ const ensureDir = (p) => {
   }
 };
 
-// Tenta criar/usar SESSION_PATH (/var/data etc). Se falhar, faz fallback para pasta do projeto
 if (!ensureDir(SESSION_BASE_PATH)) {
   const fallback = path.join(__dirname, '.wwebjs_auth');
   console.warn(`[Sessão] Não foi possível usar SESSION_BASE_PATH="${SESSION_BASE_PATH}". Tentando fallback: ${fallback}`);
   if (!ensureDir(fallback)) {
-    console.error('[Sessão] Não foi possível criar diretório de sessão nem no fallback. Continue com cuidado.');
+    console.error('[Sessão] Não foi possível criar diretório de sessão nem no fallback.');
   } else {
     sessionPathResolved = fallback;
     console.log(`[Sessão] Diretório de sessão persistente criado em (fallback): ${sessionPathResolved}`);
@@ -58,15 +55,13 @@ const requiredEnvVars = [
 ];
 
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
-
 if (missingEnvVars.length > 0) {
-  console.error('[ERRO CRÍTICO] Variáveis de ambiente essenciais não encontradas:');
+  console.error('[ERRO CRÍTICO] Variáveis de ambiente faltando:');
   missingEnvVars.forEach(v => console.error(`- ${v}`));
-  console.error('\nConfigure-as no seu ambiente ou no arquivo .env.\n');
   process.exit(1);
 }
 
-// --- CONFIGURAÇÃO DO FIREBASE ---
+// --- CONFIGURAÇÃO FIREBASE ---
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
   authDomain: process.env.FIREBASE_AUTH_DOMAIN,
@@ -79,7 +74,7 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const database = getDatabase(firebaseApp);
 
-// --- CONFIGURAÇÃO DO EXPRESS ---
+// --- EXPRESS ---
 const app = express();
 const port = process.env.PORT || 3001;
 
@@ -90,468 +85,314 @@ const allowedOrigins = [
   'http://localhost:5173',
 ];
 
-// Configuração de CORS simplificada e mais robusta
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Permite requisições sem 'origin' (ex: Postman, apps mobile) e de origens na lista
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  }
-};
-app.use(cors(corsOptions));
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
+  credentials: true,
+}));
+
+app.options('*', cors());
 app.use(express.json());
 
-// --- ARMAZENAMENTO DE SESSÕES ---
-const sessions = {};            // { sessionId: { client, status, qrAttempts } }
-const sessionModels = {};       // modelos Gemini por sessionId
-const userChats = {};           // userChats[sessionId] = { chatId: ChatSession }
-const activeInitializations = {}; // Promise lock por sessionId
+// --- SESSÕES ---
+const sessions = {};
+const sessionModels = {};
+const userChats = {};
+const activeInitializations = {};
 const reconnectionAttempts = {};
 const startRequestTimestamps = {};
 
-// --- FUNÇÕES AUXILIARES ---
+// --- SISTEMA IA ---
 const createSystemInstruction = (config) => `
-  Você é o assistente virtual do restaurante ${config.restaurantName || 'do nosso restaurante'}! Seu nome é Jataí.
-  Sua personalidade é super divertida, animada e simpática! Use emojis para deixar a conversa mais legal. 🥳🍕✨
-  Sua mensagem de boas-vindas é: "${config.welcomeMessage || 'Olá! Como posso te ajudar?'}"
-  Sua missão é ajudar os clientes com um sorriso no rosto (virtual, claro!). Use as informações abaixo para responder:
-  - Horário de funcionamento: ${config.hours || 'Não informado'}
-  - Endereço (se perguntarem onde fica): ${config.address || 'Não informado'}
-  - Link do Cardápio e Pedidos: ${config.menuUrl || 'Não informado'}
-  - Telefone de contato: ${config.phoneNumber || 'Não informado'}
-  IMPORTANTE: Ao enviar o link do cardápio, envie apenas a URL, sem formatação de link ou markdown. Por exemplo: https://seusite.com/cardapio
-  NUNCA invente informações. Se não souber algo, diga algo como: "Opa, essa pergunta me pegou! Vou chamar um humano pra te ajudar, só um minutinho! 🧑‍🍳"
+  Você é o assistente virtual do restaurante ${config.restaurantName || 'Nosso Restaurante'}!
+  Nome: Jataí 🍕🤖
+  - Seja simpático, rápido, informal e use emojis
+  - Horário: ${config.hours || 'Não informado'}
+  - Endereço: ${config.address || 'Não informado'}
+  - Cardápio: ${config.menuUrl || 'Não informado'}
+  - Telefone: ${config.phoneNumber || 'Não informado'}
+  Nunca invente informações.
 `;
 
-// Helper: espera X ms
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-// Função de limpeza de sessão (melhorada)
-// IMPORTANT: agora usa sessionPathResolved para remover auth quando for necessário
+// --- LIMPEZA DE SESSÃO ---
 const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
-  console.log(`[Sessão ${sessionId}] 🧹 Limpando sessão... (Remover Auth: ${forceRemoveAuth})`);
-  const client = sessions[sessionId] ? sessions[sessionId].client : null;
+  console.log(`[Sessão ${sessionId}] 🧹 Limpando sessão... RemoverAuth=${forceRemoveAuth}`);
 
-  try {
-    await remove(ref(database, `tenants/${sessionId}/session`)); // Limpa o status no Firebase
-  } catch (e) { /* Ignora erros se já não existir */ }
+  const client = sessions[sessionId]?.client || null;
+
+  try { await remove(ref(database, `tenants/${sessionId}/session`)); } catch {}
 
   if (client) {
     try {
-      try { client.removeAllListeners(); } catch (e) {}
+      client.removeAllListeners();
       await client.destroy();
-    } catch (error) {
-      console.error(`[Sessão ${sessionId}] Erro ao destruir cliente:`, error);
+    } catch (e) {
+      console.error(`[Sessão ${sessionId}] Erro destroy:`, e);
     }
     delete sessions[sessionId];
   }
 
-  // limpa modelo IA e chats apenas da sessão afetada
   delete sessionModels[sessionId];
-  if (userChats[sessionId]) delete userChats[sessionId];
+  delete userChats[sessionId];
 
-  console.log(`[Sessão ${sessionId}] Modelo de IA e sessão local limpos.`);
-
-  // remover arquivos de autenticação SOMENTE do caminho persistente configurado
   if (forceRemoveAuth) {
-    try {
-      const sessionFolderPath = path.join(sessionPathResolved, `session-${sessionId}`);
-      if (fs.existsSync(sessionFolderPath)) {
-        fs.rmSync(sessionFolderPath, { recursive: true, force: true });
-        console.log(`[Sessão ${sessionId}] Pasta da sessão removida FORÇADAMENTE: ${sessionFolderPath}`);
-      } else {
-        console.log(`[Sessão ${sessionId}] Pasta da sessão não encontrada para remoção: ${sessionFolderPath}`);
-      }
-    } catch (err) {
-      console.error(`[Sessão ${sessionId}] Erro ao remover a pasta da sessão:`, err);
+    const folder = path.join(sessionPathResolved, `session-${sessionId}`);
+    if (fs.existsSync(folder)) {
+      fs.rmSync(folder, { recursive: true, force: true });
+      console.log(`[Sessão ${sessionId}] Pasta removida: ${folder}`);
     }
   }
 };
 
+// --- LISTENERS DE CICLO ---
 const attachLifecycleListeners = (client, sessionId) => {
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
 
   client.once('qr', async (qr) => {
-    try {
-      const snapshot = await get(sessionRef);
-      const firebaseStatus = snapshot.exists() ? snapshot.val().status : 'disconnected';
-      if (sessions[sessionId]?.status === 'ready' || firebaseStatus === 'ready') {
-        console.log(`[Sessão ${sessionId}] ⚠️ Evento 'qr' recebido, mas a sessão já está 'ready'. Ignorando para evitar loop de reconexão.`);
-        return;
-      }
-      sessions[sessionId].qrAttempts = (sessions[sessionId].qrAttempts || 0) + 1;
-      console.log(`[Sessão ${sessionId}] QR Code gerado (Tentativa ${sessions[sessionId].qrAttempts}).`);
-      const qrUrl = await qrcode.toDataURL(qr);
-      await set(sessionRef, { status: 'QR_CODE', qr: qrUrl, attempt: sessions[sessionId].qrAttempts });
-      sessions[sessionId].status = 'QR_CODE';
-    } catch (err) {
-      console.error(`[Sessão ${sessionId}] Erro no handler 'qr':`, err);
-    }
+    const session = sessions[sessionId];
+    session.qrAttempts++;
+    const qrUrl = await qrcode.toDataURL(qr);
+
+    console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts}`);
+    await set(sessionRef, {
+      status: 'QR_CODE',
+      qr: qrUrl,
+      attempt: session.qrAttempts
+    });
   });
 
   client.once('authenticated', () => {
-    console.log(`[Sessão ${sessionId}] ✅ Autenticado com sucesso!`);
+    console.log(`[Sessão ${sessionId}] 🔐 Autenticado`);
   });
 
   client.once('ready', async () => {
-    try {
-      console.log(`[Sessão ${sessionId}] ✅ Cliente conectado e pronto!`);
-      await set(sessionRef, { status: 'ready', connectedAt: new Date().toISOString() });
-      if (sessions[sessionId]) {
-        sessions[sessionId].status = 'ready';
-        sessions[sessionId].qrAttempts = 0;
-      }
-      try { await remove(ref(database, `tenants/${sessionId}/session/qr`)); } catch(_) {}
-      reconnectionAttempts[sessionId] = 0;
-    } catch (e) {
-      console.error(`[Sessão ${sessionId}] Erro no handler 'ready':`, e);
-    }
+    console.log(`[Sessão ${sessionId}] ✅ Cliente pronto`);
+    await set(sessionRef, { status: 'ready' });
+    sessions[sessionId].status = 'ready';
+    sessions[sessionId].qrAttempts = 0;
   });
 
   client.on('message', async (message) => {
     if (message.fromMe) return;
+
     const chatId = message.from;
     console.log(`[Sessão ${sessionId}] 📩 Mensagem de ${chatId}: "${message.body}"`);
+
     try {
-      const configRef = ref(database, `tenants/${sessionId}/whatsappConfig`);
-      const snapshot = await get(configRef);
-      const config = snapshot && snapshot.exists() ? snapshot.val() : {};
-      if (config && config.isActive === false) {
-        console.log(`[Sessão ${sessionId}] Assistente desativado. Ignorando.`);
-        return;
-      }
+      const configSnap = await get(ref(database, `tenants/${sessionId}/whatsappConfig`));
+      const config = configSnap.exists() ? configSnap.val() : {};
 
       if (!sessionModels[sessionId]) {
-        const systemInstruction = createSystemInstruction(config || {});
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        // Modelo padrão atualizado para versão compatível
         const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash";
-        const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
-        sessionModels[sessionId] = model;
+        const systemInstruction = createSystemInstruction(config);
+
+        sessionModels[sessionId] = genAI.getGenerativeModel({
+          model: modelName,
+          systemInstruction
+        });
       }
 
-      if (!userChats[sessionId]) {
-        userChats[sessionId] = {};
-      }
+      if (!userChats[sessionId]) userChats[sessionId] = {};
       if (!userChats[sessionId][chatId]) {
-        console.log(`[Sessão ${sessionId}] Iniciando novo chat para o usuário ${chatId}.`);
         userChats[sessionId][chatId] = sessionModels[sessionId].startChat({ history: [] });
       }
 
       const chat = userChats[sessionId][chatId];
       const result = await chat.sendMessage(message.body);
-      const response = await result.response;
-      const text = response.text();
+      const text = result.response.text();
 
-      try {
-        await message.reply(text);
-      } catch (replyError) {
-        console.error(`[Sessão ${sessionId}] ❌ Erro ao enviar resposta (message.reply):`, replyError);
-      }
+      await message.reply(text);
 
-    } catch (error) {
-      console.error(`[Sessão ${sessionId}] ❌ Erro ao processar mensagem (IA):`, error);
-      try { await message.reply('Desculpe, não consegui processar sua solicitação no momento. 😔'); } catch (_) {}
+    } catch (err) {
+      console.error(`[Sessão ${sessionId}] Erro IA:`, err);
+      await message.reply('Desculpe, tive um problema ao processar sua mensagem.');
     }
   });
 
   client.once('disconnected', async (reason) => {
-    console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão: ${reason}`);
-    const normalizedReason = (reason || '').toString().toUpperCase();
+    console.log(`[Sessão ${sessionId}] ❌ Desconectado: ${reason}`);
 
-    if (normalizedReason === 'LOGOUT') {
-      console.log(`[Sessão ${sessionId}] 🔴 LOGOUT detectado - limpeza completa necessária.`);
+    if (String(reason).toUpperCase() === 'LOGOUT') {
       await cleanupSession(sessionId, true);
-      await set(sessionRef, { status: 'logged_out', lastReason: reason, disconnectedAt: new Date().toISOString(), requiresReauth: true });
+      await set(sessionRef, { status: 'logged_out' });
       return;
     }
 
-    // transient reasons (connection lost etc.) -> não remove auth, apenas reinicia instância
-    if (normalizedReason.includes('CONNECTION') || normalizedReason.includes('NAVIGATION') || normalizedReason.includes('TIMEOUT')) {
-      console.log(`[Sessão ${sessionId}] ⚠️ Desconexão transitória (${reason}). Limpando instância em memória para futura reconexão.`);
-      reconnectionAttempts[sessionId] = (reconnectionAttempts[sessionId] || 0) + 1;
-      await cleanupSession(sessionId, false);
-      await set(sessionRef, { status: 'disconnected', lastReason: reason, disconnectedAt: new Date().toISOString() });
-      return;
-    }
-
-    // motivos destrutivos detectados
-    const destructiveReasons = ['AUTHENTICATION_FAILED', 'CHANGE_IN_CACHE', 'UNPAIRED', 'MULTI_DEVICE_LOGOUT'];
-    if (destructiveReasons.includes(normalizedReason)) {
-      console.log(`[Sessão ${sessionId}] Motivo destrutivo (${reason}) - realizando limpeza com remoção de auth.`);
-      await cleanupSession(sessionId, true);
-      await set(sessionRef, { status: 'error', lastReason: reason, disconnectedAt: new Date().toISOString() });
-      return;
-    }
-
-    // fallback: limpar instância em memória
-    console.log(`[Sessão ${sessionId}] Desconexão sem classificação específica (${reason}). Limpando apenas instância.`);
     await cleanupSession(sessionId, false);
-    await set(sessionRef, { status: 'disconnected', lastReason: reason, disconnectedAt: new Date().toISOString() });
-  });
-
-  client.once('auth_failure', async (msg) => {
-    console.error(`[Sessão ${sessionId}] ❌ Falha na autenticação:`, msg);
-    await set(sessionRef, { status: 'AUTH_FAILURE', error: msg });
-    await cleanupSession(sessionId, true);
+    await set(sessionRef, { status: 'disconnected' });
   });
 };
 
-// --- Inicialização do WhatsApp Client (robusta) ---
-const initializeWhatsAppClient = async (sessionId, opts = {}) => {
-  if (activeInitializations[sessionId]) { // Lock principal baseado em Promise
-    console.log(`[Sessão ${sessionId}] 🔁 Inicialização já em andamento - aguardando resultado existente.`);
+// --- INICIALIZAÇÃO DO CLIENTE ---
+const initializeWhatsAppClient = async (sessionId) => {
+  if (activeInitializations[sessionId]) {
     return activeInitializations[sessionId];
   }
 
-  const initPromise = (async () => {
-    if (sessions[sessionId] && sessions[sessionId].status === 'ready' && sessions[sessionId].client) {
-      try {
-        const state = await sessions[sessionId].client.getState();
-        if (state === 'CONNECTED') {
-          console.log(`[Sessão ${sessionId}] ✅ Cliente já conectado (memória).`);
-          return sessions[sessionId];
-        }
-      } catch (e) {
-        console.log(`[Sessão ${sessionId}] ⚠️ Cliente em memória inacessível: ${e.message}. Seguindo com reinitialização.`);
-        try { await sessions[sessionId].client.destroy(); } catch (_) {}
-        delete sessions[sessionId];
-      }
-    }
-
-    let client = sessions[sessionId] ? sessions[sessionId].client : null;
-    if (!client) {
-      // Configura LocalAuth para gravar no diretório persistente configurado
-      client = new Client({
+  activeInitializations[sessionId] = new Promise(async (resolve, reject) => {
+    try {
+      let client = new Client({
         authStrategy: new LocalAuth({
           clientId: sessionId,
           dataPath: sessionPathResolved
         }),
         puppeteer: {
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu',
-            '--disable-software-rasterizer',
-            '--disable-extensions',
-            '--disable-features=IsolateOrigins,site-per-process',
-            '--disable-blink-features=AutomationControlled'
-          ],
           headless: true,
-        },
-      });
-      console.log(`[Sessão ${sessionId}] 🆕 Criando nova instância do cliente e anexando listeners.`);
-      attachLifecycleListeners(client, sessionId);
-    }
-    sessions[sessionId] = { client, status: 'INITIALIZING', qrAttempts: 0 };
-
-    const MAX_INIT_ATTEMPTS = 2;
-    let attempt = 0;
-    while (attempt < MAX_INIT_ATTEMPTS) {
-      attempt++;
-      try {
-        console.log(`[Sessão ${sessionId}] 🚀 Inicializando cliente (tentativa ${attempt}/${MAX_INIT_ATTEMPTS})...`);
-        await client.initialize();
-        // A promessa só resolve aqui, após o sucesso da inicialização.
-        return sessions[sessionId];
-      } catch (err) {
-        console.error(`[Sessão ${sessionId}] ❌ Erro na inicialização (tentativa ${attempt}):`, err && err.message ? err.message : err);
-
-        if (attempt < MAX_INIT_ATTEMPTS) {
-          const backoff = 2000 * attempt;
-          console.log(`[Sessão ${sessionId}] Aguardando ${backoff}ms antes de nova tentativa de inicialização.`);
-          await wait(backoff);
-        } else {
-          console.error(`[Sessão ${sessionId}] ❌ Excedeu número máximo de tentativas de inicialização. Limpando para permitir nova tentativa manual.`);
-          // Limpa apenas a instância (não o auth) — evita perder sessão armazenada no disco por engano
-          await cleanupSession(sessionId, false);
-          throw new Error('Initialization failed');
+          args: ['--no-sandbox', '--disable-setuid-sandbox'],
         }
-      }
+      });
+
+      attachLifecycleListeners(client, sessionId);
+
+      sessions[sessionId] = { client, status: 'INITIALIZING', qrAttempts: 0 };
+
+      await client.initialize();
+      resolve(sessions[sessionId]);
+
+    } catch (e) {
+      reject(e);
+    } finally {
+      delete activeInitializations[sessionId];
     }
-  })();
+  });
 
-  activeInitializations[sessionId] = initPromise;
-
-  try {
-    const res = await initPromise;
-    return res;
-  } finally { // Garante que o lock seja liberado, aconteça o que acontecer.
-    delete activeInitializations[sessionId];
-  }
+  return activeInitializations[sessionId];
 };
 
-// --- ROTAS DA API ---
+// --- HEALTH CHECK ---
 app.get('/health', (req, res) => {
-  const healthInfo = {
+  res.json({
     status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: {
-      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
-      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB'
-    },
-    activeSessions: Object.keys(sessions).length,
-    environment: process.env.NODE_ENV || 'development',
-    sessionPath: sessionPathResolved
-  };
-  console.log('[Health Check] Status:', healthInfo);
-  res.status(200).json(healthInfo);
+    time: new Date().toISOString(),
+    sessions: Object.keys(sessions)
+  });
 });
 
+// --- STATUS ROUTE ---
 app.get('/api/whatsapp/status/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
-  try {
-    const statusRef = ref(database, `tenants/${sessionId}/session/status`);
-    const snapshot = await get(statusRef);
-    const status = snapshot.exists() ? snapshot.val() : 'disconnected';
-    res.json({ status });
-  } catch (error) {
-    console.error(`[Status ${sessionId}] Erro:`, error);
-    res.status(500).json({ status: 'disconnected', message: 'Erro ao buscar status.' });
-  }
+  const snap = await get(ref(database, `tenants/${sessionId}/session/status`));
+  res.json({ status: snap.exists() ? snap.val() : 'disconnected' });
 });
 
+// --- QR ROUTE ---
 app.get('/api/whatsapp/qr/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
   try {
     const qrRef = ref(database, `tenants/${sessionId}/session/qr`);
     const snapshot = await get(qrRef);
     if (snapshot.exists()) {
-      res.status(200).json({ qr: snapshot.val() });
+      res.json({ qr: snapshot.val() });
     } else {
-      res.status(200).json({ qr: null, message: 'QR code ainda não gerado ou já utilizado.' });
+      res.json({ qr: null, message: 'QR ainda não gerado.' });
     }
-  } catch (error) {
-    console.error(`[QR ${sessionId}] Erro:`, error);
-    res.status(500).json({ error: 'Erro ao buscar QR code.', qr: null });
+  } catch (e) {
+    console.error(`[QR ${sessionId}] erro:`, e);
+    res.status(500).json({ error: 'Erro ao buscar QR' });
   }
 });
 
-// Rota start atualizada: não seta lock aqui — initializeWhatsAppClient gerencia locks
+// --- START SESSION ---
 app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
 
-  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-  const forwardedFor = req.headers['x-forwarded-for'] || req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
-  const userAgent = req.headers['user-agent'] || 'unknown';
-  console.log(`[${requestId}] [Sessão ${sessionId}] 📥 Recebida requisição para iniciar. from=${forwardedFor} ua="${userAgent}"`);
-
-  // RATE LIMITING: Prevenir múltiplas requisições do frontend
   const now = Date.now();
-  const DEBOUNCE_WINDOW = 10000; // 10 segundos
-  
+  const WINDOW = 10000;
+
   if (startRequestTimestamps[sessionId]) {
-    const timeSinceLastRequest = now - startRequestTimestamps[sessionId];
-    if (timeSinceLastRequest < DEBOUNCE_WINDOW) {
-      const waitTime = Math.ceil((DEBOUNCE_WINDOW - timeSinceLastRequest) / 1000);
-      console.log(`[${requestId}] [Sessão ${sessionId}] ⏱️ Requisição duplicada ignorada (${timeSinceLastRequest}ms desde última).`);
-      return res.status(429).json({ 
-        success: false, 
-        message: `Aguarde ${waitTime} segundos antes de tentar novamente.`,
-        retryAfter: waitTime
+    const delta = now - startRequestTimestamps[sessionId];
+    if (delta < WINDOW) {
+      return res.status(429).json({
+        success: false,
+        message: `Espere ${Math.ceil((WINDOW - delta) / 1000)} segundos para tentar novamente`
       });
     }
   }
-  
+
   startRequestTimestamps[sessionId] = now;
 
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
-  let snapshot;
-  try { snapshot = await get(sessionRef); } catch (err) { snapshot = null; }
-  const firebaseStatus = snapshot && snapshot.exists() ? snapshot.val().status : 'disconnected';
+  const snap = await get(sessionRef);
+  const fbStatus = snap.exists() ? snap.val().status : 'disconnected';
 
-  // Verificar TANTO Firebase QUANTO memória
-  if (firebaseStatus === 'ready' && sessions[sessionId]) {
+  if (fbStatus === 'ready' && sessions[sessionId]) {
     try {
       const state = await sessions[sessionId].client.getState();
       if (state === 'CONNECTED') {
-        console.log(`[${requestId}] [Sessão ${sessionId}] ✅ Cliente realmente conectado.`);
-        return res.status(200).json({ success: true, message: 'Sessão já conectada.' });
-      } else {
-        console.log(`[${requestId}] [Sessão ${sessionId}] ⚠️ Firebase diz 'ready' mas cliente está ${state}. Reiniciando.`);
-        await cleanupSession(sessionId, false);
+        return res.json({ success: true, message: 'Sessão já conectada' });
       }
-    } catch (e) {
-      console.log(`[${requestId}] [Sessão ${sessionId}] ⚠️ Erro ao verificar estado: ${e.message}. Reiniciando.`);
-      await cleanupSession(sessionId, false);
-    }
-  } else if (firebaseStatus === 'ready' && !sessions[sessionId]) {
-    console.log(`[${requestId}] [Sessão ${sessionId}] ⚠️ Firebase diz 'ready' mas sessão não existe em memória. Reiniciando.`);
-    await cleanupSession(sessionId, false);
+    } catch {}
   }
 
-  if (activeInitializations[sessionId]) {
-    console.log(`[${requestId}] [Sessão ${sessionId}] 🔁 Inicialização já em andamento - vinculando à promessa existente.`);
-    return res.status(202).json({ success: true, message: 'Sessão em inicialização. Aguarde (já existe uma inicialização em andamento).' });
-  }
+  console.log(`[Sessão ${sessionId}] Iniciando inicialização...`);
 
-  console.log(`[${requestId}] [Sessão ${sessionId}] 🔔 Iniciando initializeWhatsAppClient...`);
   initializeWhatsAppClient(sessionId)
-    .then(() => console.log(`[${requestId}] [Sessão ${sessionId}] Inicialização concluída (promessa resolvida).`))
-    .catch(err => {
-      console.error(`[${requestId}] [Sessão ${sessionId}] ❌ Falha na inicialização (promessa rejeitada):`, err && err.message ? err.message : err);
-    });
+    .then(() => console.log(`[Sessão ${sessionId}] Inicialização concluída`))
+    .catch(e => console.error(`[Sessão ${sessionId}] Falha init:`, e));
 
-  return res.status(202).json({ success: true, message: 'Inicialização iniciada — QR será disponibilizado no Firebase.', requestId });
+  res.json({ success: true, message: 'Inicialização iniciada' });
 });
 
+// --- STOP SESSION ---
 app.post('/api/whatsapp/stop/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
-  const session = sessions[sessionId];
 
+  const session = sessions[sessionId];
   if (session && session.client) {
-    console.log(`[Sessão ${sessionId}] 🛑 Recebida requisição para parar.`);
     try {
       await session.client.logout();
       await cleanupSession(sessionId, true);
-      res.status(200).json({ success: true, message: `Sessão ${sessionId} desconectada.` });
-    } catch (error) {
-      console.error(`[Sessão ${sessionId}] Erro ao fazer logout:`, error);
-      res.status(500).json({ success: false, error: 'Erro ao desconectar.' });
+      res.json({ success: true, message: 'Sessão encerrada' });
+    } catch (e) {
+      res.status(500).json({ error: 'Erro ao desconectar' });
     }
   } else {
-    try { await set(ref(database, `tenants/${sessionId}/session/status`), 'disconnected'); } catch(_) {}
-    res.status(404).json({ success: false, error: `Sessão ${sessionId} não encontrada ou já inativa.` });
+    res.status(404).json({ error: 'Sessão não existe' });
   }
 });
 
+// --- UPDATE CONFIG ---
 app.post('/api/config/update/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
-  const newConfig = req.body;
+  const data = req.body;
 
-  if (!newConfig || Object.keys(newConfig).length === 0) {
-    return res.status(400).json({ success: false, error: 'Nenhum dado fornecido.' });
+  if (!data || Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'Nenhum dado enviado' });
   }
+
   try {
-    const configRef = ref(database, `tenants/${sessionId}/whatsappConfig`);
-    await set(configRef, newConfig);
-    delete sessionModels[sessionId]; // Invalida o modelo de IA para ser recriado com a nova config
-    if (userChats[sessionId]) delete userChats[sessionId];
-    console.log(`[Sessão ${sessionId}] ⚙️ Configurações atualizadas.`);
-    res.status(200).json({ success: true, message: 'Configurações atualizadas.' });
-  } catch (error) {
-    console.error(`[Config ${sessionId}] Erro ao salvar:`, error);
-    res.status(500).json({ success: false, error: 'Erro ao salvar a configuração.' });
+    const cfgRef = ref(database, `tenants/${sessionId}/whatsappConfig`);
+    await set(cfgRef, data);
+
+    delete sessionModels[sessionId];
+    delete userChats[sessionId];
+
+    res.json({ success: true, message: 'Configurações atualizadas' });
+  } catch (e) {
+    console.error(`[Config ${sessionId}] erro:`, e);
+    res.status(500).json({ error: 'Falha ao salvar config' });
   }
 });
 
-// --- PROTEÇÕES GLOBAIS ---
+// --- GLOBAL ERROR HANDLERS ---
 process.on('unhandledRejection', (reason, p) => {
-  console.error('Unhandled Rejection at:', p, 'reason:', reason);
-});
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception thrown:', err);
+  console.error('Unhandled Rejection:', reason);
 });
 
-// --- INICIALIZAÇÃO DO SERVIDOR ---
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+// --- START SERVER ---
 app.listen(port, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${port}`);
-  console.log('📱 Aguardando requisições para iniciar sessões do WhatsApp...');
-}); 
+  console.log('📱 Aguardando sessões do WhatsApp...');
+});
