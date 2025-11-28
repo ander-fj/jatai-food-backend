@@ -12,18 +12,37 @@ const fs = require('fs');
 const path = require('path');
 
 // --- CONFIGURAÇÃO DE SESSÃO PERSISTENTE (Render / servidores similares) ---
-const SESSION_BASE_PATH = process.env.SESSION_PATH || '/var/data/wwebjs_auth';
-// garante que o diretório exista e seja gravável
-try {
-  if (!fs.existsSync(SESSION_BASE_PATH)) {
-    fs.mkdirSync(SESSION_BASE_PATH, { recursive: true });
-    console.log(`[Sessão] Diretório de sessão persistente criado em: ${SESSION_BASE_PATH}`);
-  } else {
-    console.log(`[Sessão] Diretório de sessão persistente: ${SESSION_BASE_PATH}`);
+// Tentativa de usar SESSION_PATH (se definido), senão tenta /var/data (quando disponível), por fim usa pasta dentro do projeto (__dirname)
+let SESSION_BASE_PATH = process.env.SESSION_PATH || '/var/data/wwebjs_auth';
+let sessionPathResolved = SESSION_BASE_PATH;
+
+const ensureDir = (p) => {
+  try {
+    if (!fs.existsSync(p)) {
+      fs.mkdirSync(p, { recursive: true });
+    }
+    // test write
+    const testFile = path.join(p, `.writetest-${Date.now()}`);
+    fs.writeFileSync(testFile, 'ok');
+    fs.unlinkSync(testFile);
+    return true;
+  } catch (err) {
+    return false;
   }
-} catch (err) {
-  console.error('[Sessão] Não foi possível criar/verificar SESSION_BASE_PATH:', err);
-  // não interrompe; o LocalAuth pode usar o padrão se não for possível criar
+};
+
+// Tenta criar/usar SESSION_PATH (/var/data etc). Se falhar, faz fallback para pasta do projeto
+if (!ensureDir(SESSION_BASE_PATH)) {
+  const fallback = path.join(__dirname, '.wwebjs_auth');
+  console.warn(`[Sessão] Não foi possível usar SESSION_BASE_PATH="${SESSION_BASE_PATH}". Tentando fallback: ${fallback}`);
+  if (!ensureDir(fallback)) {
+    console.error('[Sessão] Não foi possível criar diretório de sessão nem no fallback. Continue com cuidado.');
+  } else {
+    sessionPathResolved = fallback;
+    console.log(`[Sessão] Diretório de sessão persistente criado em (fallback): ${sessionPathResolved}`);
+  }
+} else {
+  console.log(`[Sessão] Diretório de sessão persistente: ${sessionPathResolved}`);
 }
 
 // --- VALIDAÇÃO DE VARIÁVEIS DE AMBIENTE ---
@@ -116,7 +135,7 @@ const createSystemInstruction = (config) => `
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 // Função de limpeza de sessão (melhorada)
-// IMPORTANT: agora usa SESSION_BASE_PATH para remover auth quando for necessário
+// IMPORTANT: agora usa sessionPathResolved para remover auth quando for necessário
 const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   console.log(`[Sessão ${sessionId}] 🧹 Limpando sessão... (Remover Auth: ${forceRemoveAuth})`);
   const client = sessions[sessionId] ? sessions[sessionId].client : null;
@@ -144,7 +163,7 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   // remover arquivos de autenticação SOMENTE do caminho persistente configurado
   if (forceRemoveAuth) {
     try {
-      const sessionFolderPath = path.join(SESSION_BASE_PATH, `session-${sessionId}`);
+      const sessionFolderPath = path.join(sessionPathResolved, `session-${sessionId}`);
       if (fs.existsSync(sessionFolderPath)) {
         fs.rmSync(sessionFolderPath, { recursive: true, force: true });
         console.log(`[Sessão ${sessionId}] Pasta da sessão removida FORÇADAMENTE: ${sessionFolderPath}`);
@@ -314,7 +333,7 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       client = new Client({
         authStrategy: new LocalAuth({
           clientId: sessionId,
-          dataPath: SESSION_BASE_PATH
+          dataPath: sessionPathResolved
         }),
         puppeteer: {
           args: [
@@ -385,7 +404,7 @@ app.get('/health', (req, res) => {
     },
     activeSessions: Object.keys(sessions).length,
     environment: process.env.NODE_ENV || 'development',
-    sessionPath: SESSION_BASE_PATH
+    sessionPath: sessionPathResolved
   };
   console.log('[Health Check] Status:', healthInfo);
   res.status(200).json(healthInfo);
@@ -469,7 +488,7 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
       await cleanupSession(sessionId, false);
     }
   } else if (firebaseStatus === 'ready' && !sessions[sessionId]) {
-    console.log(`[${requestId}] [Sessão ${sessionId}] ⚠️ Firebase diz 'ready' mas sessão não existe em memória. Reiniciando.`);
+    console.log(`[${requestId}] [Sessão ${sessionId}] ⚠️ Firebase diz 'ready' mas sessão não existe em memória. Reiniciando.`);
     await cleanupSession(sessionId, false);
   }
 
