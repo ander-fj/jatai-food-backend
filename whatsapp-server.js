@@ -141,7 +141,7 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
 
 // --- Inicialização do WhatsApp Client (robusta) ---
 const initializeWhatsAppClient = async (sessionId, opts = {}) => {
-  if (activeInitializations[sessionId]) {
+  if (activeInitializations[sessionId]) { // Lock principal baseado em Promise
     console.log(`[Sessão ${sessionId}] 🔁 Inicialização já em andamento - aguardando resultado existente.`);
     return activeInitializations[sessionId];
   }
@@ -161,12 +161,6 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       }
     }
 
-    if (initializingLocks[sessionId]) {
-      console.log(`[Sessão ${sessionId}] ⏳ Lock detectado - abortando criação duplicada.`);
-      throw new Error('Already initializing');
-    }
-    initializingLocks[sessionId] = true;
-    console.log(`[Sessão ${sessionId}] 🔒 Lock de inicialização ativado (initializeWhatsAppClient).`);
 
     const sessionRef = ref(database, `tenants/${sessionId}/session`);
     try {
@@ -205,11 +199,12 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
     // QR event
     client.on('qr', async (qr) => {
       try {
+        // Verificação dupla: status em memória E no Firebase para evitar race conditions.
         const snapshot = await get(sessionRef);
         const firebaseStatus = snapshot.exists() ? snapshot.val().status : 'disconnected';
-        if (firebaseStatus === 'ready') {
-          console.log(`[Sessão ${sessionId}] ⚠️ Evento 'qr' recebido, mas sessão já está 'ready' no Firebase. Ignorando geração de QR Code.`);
-          return;
+        if (sessions[sessionId]?.status === 'ready' || firebaseStatus === 'ready') {
+          console.log(`[Sessão ${sessionId}] ⚠️ Evento 'qr' recebido, mas a sessão já está 'ready'. Ignorando para evitar loop de reconexão.`);
+          return; // Ponto CRÍTICO da correção: não processar QR se já estiver conectado.
         }
         sessions[sessionId].qrAttempts++;
         console.log(`[Sessão ${sessionId}] QR Code gerado (Tentativa ${sessions[sessionId].qrAttempts}).`);
@@ -234,9 +229,7 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
         try { await remove(ref(database, `tenants/${sessionId}/session/qr`)); } catch(_) {}
         reconnectionAttempts[sessionId] = 0;
       } catch (e) {
-        console.error(`[Sessão ${sessionId}] Erro no handler 'ready':`, e);
-      } finally {
-        if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
+        console.error(`[Sessão ${sessionId}] Erro no handler 'ready':`, e); // O lock da promise é removido no final do processo
       }
     });
 
@@ -297,12 +290,11 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
             status: 'logged_out', 
             lastReason: reason, 
             disconnectedAt: new Date().toISOString(),
-            requiresReauth: true 
+            requiresReauth: true
           });
           reconnectionAttempts[sessionId] = 0;
-          if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
           return; // NÃO tenta reconectar automaticamente
-        }
+        } // Fim do tratamento de LOGOUT
         
         // Apenas CONNECTION_LOST e similares são transitórios
         if (reason.toUpperCase().includes('CONNECTION') || reason === 'NAVIGATION') {
@@ -314,13 +306,10 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
           if (reconnectionAttempts[sessionId] <= maxAttempts) {
             const delay = 2000 * reconnectionAttempts[sessionId];
             console.log(`[Sessão ${sessionId}] Tentativa de reconexão em ${delay}ms (tentativa ${reconnectionAttempts[sessionId]}/${maxAttempts}).`);
-            if (!initializingLocks[sessionId]) {
-              setTimeout(() => {
-                initializeWhatsAppClient(sessionId).catch(e => console.error(`[Sessão ${sessionId}] Erro ao reconectar depois de desconexão:`, e));
-              }, delay);
-            } else {
-              console.log(`[Sessão ${sessionId}] Já existe lock de inicialização, skipping reconnection timer.`);
-            }
+            // A inicialização não deve ser chamada diretamente aqui para evitar duplicação.
+            // A lógica de 'start' do frontend deve ser a fonte da verdade para reiniciar.
+            // Apenas limpamos o estado para permitir uma nova inicialização.
+            await cleanupSession(sessionId, false); // Limpa a sessão em memória, mas mantém a autenticação.
             return;
           } else {
             console.log(`[Sessão ${sessionId}] Ultrapassou tentativas de reconexão (${maxAttempts}). Requer intervenção manual.`);
@@ -347,17 +336,13 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
         }
       } catch (err) {
         console.error(`[Sessão ${sessionId}] Erro no handler 'disconnected':`, err);
-      } finally {
-        if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
       }
     });
 
     client.on('auth_failure', async (msg) => {
       console.error(`[Sessão ${sessionId}] ❌ Falha na autenticação:`, msg);
-      try { await set(sessionRef, { status: 'AUTH_FAILURE', error: msg }); } catch(_) {}
-      sessions[sessionId] && (sessions[sessionId].status = 'AUTH_FAILURE');
-      await cleanupSession(sessionId, true);
-      if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
+      await set(sessionRef, { status: 'AUTH_FAILURE', error: msg });
+      await cleanupSession(sessionId, true); // Falha de autenticação sempre requer limpeza completa.
     });
 
     const MAX_INIT_ATTEMPTS = 2;
@@ -370,17 +355,15 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
         return sessions[sessionId];
       } catch (err) {
         console.error(`[Sessão ${sessionId}] ❌ Erro na inicialização (tentativa ${attempt}):`, err && err.message ? err.message : err);
-        try { client.removeAllListeners(); } catch(_) {}
-        try { await client.destroy(); } catch(_) {}
-        delete sessions[sessionId];
+        await cleanupSession(sessionId, false); // Limpa a instância, mas mantém a autenticação para a próxima tentativa.
+
         if (attempt < MAX_INIT_ATTEMPTS) {
           const backoff = 2000 * attempt;
           console.log(`[Sessão ${sessionId}] Aguardando ${backoff}ms antes de nova tentativa de inicialização.`);
           await wait(backoff);
         } else {
-          console.error(`[Sessão ${sessionId}] ❌ Excedeu número máximo de tentativas de inicialização.`);
+          console.error(`[Sessão ${sessionId}] ❌ Excedeu número máximo de tentativas de inicialização. Limpando para permitir nova tentativa manual.`);
           try { await set(sessionRef, { status: 'ERROR', error: 'INIT_FAILED' }); } catch(_) {}
-          if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
           throw new Error('Initialization failed');
         }
       }
@@ -392,7 +375,7 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
   try {
     const res = await initPromise;
     return res;
-  } finally {
+  } finally { // Garante que o lock seja liberado, aconteça o que acontecer.
     delete activeInitializations[sessionId];
   }
 };
@@ -506,8 +489,7 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   initializeWhatsAppClient(sessionId)
     .then(() => console.log(`[${requestId}] [Sessão ${sessionId}] Inicialização concluída (promessa resolvida).`))
     .catch(err => {
-      console.error(`[${requestId}] [Sessão ${sessionId}] ❌ Falha na inicialização:`, err && err.message ? err.message : err);
-      if (initializingLocks[sessionId]) delete initializingLocks[sessionId];
+      console.error(`[${requestId}] [Sessão ${sessionId}] ❌ Falha na inicialização (promessa rejeitada):`, err && err.message ? err.message : err);
     });
 
   return res.status(202).json({ success: true, message: 'Inicialização iniciada — aguarde o QR Code.', requestId });
