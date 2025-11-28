@@ -559,4 +559,4 @@ process.on('uncaughtException', (err) => {
 app.listen(port, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${port}`);
   console.log('📱 Aguardando requisições para iniciar sessões do WhatsApp...');
-});
+}); 
