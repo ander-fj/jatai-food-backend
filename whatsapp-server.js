@@ -193,7 +193,7 @@ const attachLifecycleListeners = (client, sessionId) => {
       if (!sessionModels[sessionId]) {
         const systemInstruction = createSystemInstruction(config);
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-1.5-flash";
+        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash";
         const model = genAI.getGenerativeModel({ model: modelName, systemInstruction });
         sessionModels[sessionId] = model;
       }
