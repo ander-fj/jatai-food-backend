@@ -488,7 +488,7 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
       await cleanupSession(sessionId, false);
     }
   } else if (firebaseStatus === 'ready' && !sessions[sessionId]) {
-    console.log(`[${requestId}] [Sessão ${sessionId}] ⚠️ Firebase diz 'ready' mas sessão não existe em memória. Reiniciando.`);
+    console.log(`[${requestId}] [Sessão ${sessionId}] ⚠️ Firebase diz 'ready' mas sessão não existe em memória. Reiniciando.`);
     await cleanupSession(sessionId, false);
   }
 
