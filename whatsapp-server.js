@@ -108,13 +108,14 @@ const reconnectionAttempts = {};
 const startRequestTimestamps = {};
 const reconnectionTimers = {};
 const qrRegenerationTimers = {};
+const messageProcessingLocks = {}; // Evitar processamento simultâneo
 
 // --- CONSTANTES ---
 const MAX_RECONNECTION_ATTEMPTS = 5;
 const RECONNECTION_DELAY = 5000; // 5 segundos
 const HEARTBEAT_INTERVAL = 30000; // 30 segundos
-const QR_REGENERATION_TIMEOUT = 120000; // 2 minutos - se QR for regenerado após ready, é logout
-const READY_TIMEOUT = 60000; // 1 minuto para atingir ready
+const QR_REGENERATION_TIMEOUT = 120000; // 2 minutos
+const MESSAGE_TIMEOUT = 30000; // 30 segundos para processar mensagem
 
 // --- SISTEMA IA ---
 const createSystemInstruction = (config) => `
@@ -130,6 +131,23 @@ const createSystemInstruction = (config) => `
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
+// --- FUNÇÕES DE VALIDAÇÃO ---
+const isPuppeteerError = (error) => {
+  const errorStr = String(error);
+  return errorStr.includes('Falha na avaliação') || 
+         errorStr.includes('ExecutionContext') ||
+         errorStr.includes('Target closed') ||
+         errorStr.includes('Session closed');
+};
+
+const isConnectionError = (error) => {
+  const errorStr = String(error);
+  return errorStr.includes('ECONNREFUSED') ||
+         errorStr.includes('ETIMEDOUT') ||
+         errorStr.includes('EHOSTUNREACH') ||
+         errorStr.includes('socket hang up');
+};
+
 // --- LIMPEZA DE SESSÃO ---
 const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   console.log(`[Sessão ${sessionId}] 🧹 Limpando sessão... RemoveAuth=${forceRemoveAuth}`);
@@ -143,21 +161,21 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
       client.removeAllListeners();
       await client.destroy();
     } catch (e) {
-      console.error(`[Sessão ${sessionId}] Erro ao destruir cliente:`, e);
+      console.error(`[Sessão ${sessionId}] Erro ao destruir cliente:`, e.message);
     }
     delete sessions[sessionId];
   }
 
   delete sessionModels[sessionId];
   delete userChats[sessionId];
+  delete messageProcessingLocks[sessionId];
 
-  // Limpar timers de reconexão
+  // Limpar timers
   if (reconnectionTimers[sessionId]) {
     clearTimeout(reconnectionTimers[sessionId]);
     delete reconnectionTimers[sessionId];
   }
 
-  // Limpar timers de regeneração de QR
   if (qrRegenerationTimers[sessionId]) {
     clearTimeout(qrRegenerationTimers[sessionId]);
     delete qrRegenerationTimers[sessionId];
@@ -166,8 +184,12 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   if (forceRemoveAuth) {
     const folder = path.join(sessionPathResolved, `session-${sessionId}`);
     if (fs.existsSync(folder)) {
-      fs.rmSync(folder, { recursive: true, force: true });
-      console.log(`[Sessão ${sessionId}] Pasta removida: ${folder}`);
+      try {
+        fs.rmSync(folder, { recursive: true, force: true });
+        console.log(`[Sessão ${sessionId}] Pasta removida: ${folder}`);
+      } catch (e) {
+        console.error(`[Sessão ${sessionId}] Erro ao remover pasta:`, e.message);
+      }
     }
   }
 };
@@ -190,8 +212,7 @@ const startHeartbeat = (sessionId) => {
   const interval = setInterval(async () => {
     try {
       if (await isClientValid(sessionId)) {
-        // Apenas verifica o estado, não faz nada
-        // console.log(`[Sessão ${sessionId}] 💓 Heartbeat OK`);
+        // OK
       } else {
         clearInterval(interval);
       }
@@ -207,7 +228,6 @@ const startHeartbeat = (sessionId) => {
 const attachLifecycleListeners = (client, sessionId) => {
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
 
-  // Usar 'on' para QR para permitir múltiplas tentativas
   client.on('qr', async (qr) => {
     const session = sessions[sessionId];
     if (!session) return;
@@ -221,7 +241,6 @@ const attachLifecycleListeners = (client, sessionId) => {
     if (session.status === 'ready') {
       console.warn(`[Sessão ${sessionId}] ⚠️  QR regenerado após estar ready - Detectando logout automático`);
       
-      // Aguardar um pouco para confirmar se é realmente um logout
       if (qrRegenerationTimers[sessionId]) {
         clearTimeout(qrRegenerationTimers[sessionId]);
       }
@@ -233,7 +252,7 @@ const attachLifecycleListeners = (client, sessionId) => {
           await cleanupSession(sessionId, true);
           await set(sessionRef, { status: 'logged_out', reason: 'auto_logout_detected' });
         }
-      }, 3000); // Aguardar 3 segundos para confirmar
+      }, 3000);
     } else {
       await set(sessionRef, {
         status: 'QR_CODE',
@@ -255,12 +274,10 @@ const attachLifecycleListeners = (client, sessionId) => {
     sessions[sessionId].reconnectAttempts = 0;
     sessions[sessionId].lastActivity = Date.now();
 
-    // Iniciar heartbeat
     if (!sessions[sessionId].heartbeatInterval) {
       sessions[sessionId].heartbeatInterval = startHeartbeat(sessionId);
     }
 
-    // Limpar timer de QR regeneração se existir
     if (qrRegenerationTimers[sessionId]) {
       clearTimeout(qrRegenerationTimers[sessionId]);
       delete qrRegenerationTimers[sessionId];
@@ -271,12 +288,28 @@ const attachLifecycleListeners = (client, sessionId) => {
     if (message.fromMe) return;
 
     const chatId = message.from;
-    console.log(`[Sessão ${sessionId}] 📩 Mensagem de ${chatId}: "${message.body}"`);
+    const messageId = message.id.id || `${Date.now()}-${Math.random()}`;
+
+    // Evitar processamento simultâneo da mesma mensagem
+    if (messageProcessingLocks[messageId]) {
+      console.log(`[Sessão ${sessionId}] ⏭️  Mensagem já está sendo processada, ignorando duplicata`);
+      return;
+    }
+
+    messageProcessingLocks[messageId] = true;
 
     try {
+      console.log(`[Sessão ${sessionId}] 📩 Mensagem de ${chatId}: "${message.body}"`);
+
       // Verificar se o cliente ainda está válido
       if (!await isClientValid(sessionId)) {
-        console.warn(`[Sessão ${sessionId}] Cliente inválido ao receber mensagem`);
+        console.warn(`[Sessão ${sessionId}] ⚠️  Cliente inválido ao receber mensagem`);
+        return;
+      }
+
+      // Verificar se a mensagem está vazia
+      if (!message.body || message.body.trim() === '') {
+        console.log(`[Sessão ${sessionId}] ⏭️  Mensagem vazia, ignorando`);
         return;
       }
 
@@ -300,23 +333,48 @@ const attachLifecycleListeners = (client, sessionId) => {
       }
 
       const chat = userChats[sessionId][chatId];
-      const result = await chat.sendMessage(message.body);
+
+      // Usar timeout para evitar travamento
+      const result = await Promise.race([
+        chat.sendMessage(message.body),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout ao processar mensagem')), MESSAGE_TIMEOUT)
+        )
+      ]);
+
       const text = result.response.text();
+
+      // Verificar novamente se o cliente está válido antes de responder
+      if (!await isClientValid(sessionId)) {
+        console.warn(`[Sessão ${sessionId}] ⚠️  Cliente desconectou antes de enviar resposta`);
+        return;
+      }
 
       await message.reply(text);
       sessions[sessionId].lastActivity = Date.now();
 
     } catch (err) {
-      console.error(`[Sessão ${sessionId}] Erro IA:`, err);
-      try {
-        await message.reply('Desculpe, tive um problema ao processar sua mensagem.');
-      } catch (replyErr) {
-        console.error(`[Sessão ${sessionId}] Erro ao enviar mensagem de erro:`, replyErr);
+      console.error(`[Sessão ${sessionId}] Erro ao processar mensagem:`, err.message);
+
+      // Se for erro do Puppeteer, a desconexão será tratada pelo listener 'disconnected'
+      if (isPuppeteerError(err)) {
+        console.error(`[Sessão ${sessionId}] ❌ Erro crítico do Puppeteer detectado`);
+        return;
       }
+
+      // Tentar enviar mensagem de erro apenas se o cliente ainda está válido
+      if (await isClientValid(sessionId)) {
+        try {
+          await message.reply('Desculpe, tive um problema ao processar sua mensagem.');
+        } catch (replyErr) {
+          console.error(`[Sessão ${sessionId}] Erro ao enviar mensagem de erro:`, replyErr.message);
+        }
+      }
+    } finally {
+      delete messageProcessingLocks[messageId];
     }
   });
 
-  // Usar 'on' em vez de 'once' para capturar múltiplas desconexões
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Desconectado: ${reason}`);
 
@@ -327,7 +385,6 @@ const attachLifecycleListeners = (client, sessionId) => {
       return;
     }
 
-    // Para outras desconexões, tentar reconectar
     await cleanupSession(sessionId, false);
     await set(sessionRef, { status: 'disconnected' });
 
@@ -339,16 +396,15 @@ const attachLifecycleListeners = (client, sessionId) => {
       reconnectionTimers[sessionId] = setTimeout(() => {
         initializeWhatsAppClient(sessionId)
           .then(() => console.log(`[Sessão ${sessionId}] Reconexão bem-sucedida`))
-          .catch(e => console.error(`[Sessão ${sessionId}] Falha na reconexão:`, e));
-      }, RECONNECTION_DELAY * (attempts + 1)); // Backoff exponencial
+          .catch(e => console.error(`[Sessão ${sessionId}] Falha na reconexão:`, e.message));
+      }, RECONNECTION_DELAY * (attempts + 1));
     } else {
       console.error(`[Sessão ${sessionId}] Máximo de tentativas de reconexão atingido`);
     }
   });
 
-  // Listener para erros
   client.on('error', (err) => {
-    console.error(`[Sessão ${sessionId}] Erro do cliente:`, err);
+    console.error(`[Sessão ${sessionId}] Erro do cliente:`, err.message);
   });
 };
 
@@ -383,8 +439,11 @@ const initializeWhatsAppClient = async (sessionId) => {
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage', // Evitar problemas de memória
-            '--disable-gpu', // Desabilitar GPU para estabilidade
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-extensions',
+            '--disable-plugins',
+            '--disable-images', // Desabilitar carregamento de imagens para economizar memória
           ],
         }
       });
@@ -404,7 +463,7 @@ const initializeWhatsAppClient = async (sessionId) => {
       resolve(sessions[sessionId]);
 
     } catch (e) {
-      console.error(`[Sessão ${sessionId}] Erro na inicialização:`, e);
+      console.error(`[Sessão ${sessionId}] Erro na inicialização:`, e.message);
       reject(e);
     } finally {
       delete activeInitializations[sessionId];
@@ -427,7 +486,6 @@ app.get('/health', (req, res) => {
 app.get('/api/whatsapp/status/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
   
-  // Verificar estado real do cliente
   const isValid = await isClientValid(sessionId);
   
   if (isValid) {
@@ -454,7 +512,7 @@ app.get('/api/whatsapp/qr/:sessionId', async (req, res) => {
       res.json({ qr: null, message: 'QR ainda não gerado.' });
     }
   } catch (e) {
-    console.error(`[QR ${sessionId}] erro:`, e);
+    console.error(`[QR ${sessionId}] erro:`, e.message);
     res.status(500).json({ error: 'Erro ao buscar QR' });
   }
 });
@@ -493,7 +551,7 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
 
   initializeWhatsAppClient(sessionId)
     .then(() => console.log(`[Sessão ${sessionId}] Inicialização concluída`))
-    .catch(e => console.error(`[Sessão ${sessionId}] Falha init:`, e));
+    .catch(e => console.error(`[Sessão ${sessionId}] Falha init:`, e.message));
 
   res.json({ success: true, message: 'Inicialização iniciada' });
 });
@@ -509,7 +567,7 @@ app.post('/api/whatsapp/stop/:sessionId', async (req, res) => {
       await cleanupSession(sessionId, true);
       res.json({ success: true, message: 'Sessão encerrada' });
     } catch (e) {
-      console.error(`[Sessão ${sessionId}] Erro ao desconectar:`, e);
+      console.error(`[Sessão ${sessionId}] Erro ao desconectar:`, e.message);
       res.status(500).json({ error: 'Erro ao desconectar' });
     }
   } else {
@@ -535,7 +593,7 @@ app.post('/api/config/update/:sessionId', async (req, res) => {
 
     res.json({ success: true, message: 'Configurações atualizadas' });
   } catch (e) {
-    console.error(`[Config ${sessionId}] erro:`, e);
+    console.error(`[Config ${sessionId}] erro:`, e.message);
     res.status(500).json({ error: 'Falha ao salvar config' });
   }
 });
@@ -546,7 +604,7 @@ process.on('unhandledRejection', (reason, p) => {
 });
 
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
+  console.error('Uncaught Exception:', err.message);
 });
 
 // --- CLEANUP ON EXIT ---
