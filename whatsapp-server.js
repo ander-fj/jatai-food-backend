@@ -83,6 +83,7 @@ const allowedOrigins = [
   'https://jataifood.com.br',
   'https://jatai-food-backend.onrender.com',
   'http://localhost:5173',
+  'http://localhost:5174',
 ];
 
 app.use(cors({
