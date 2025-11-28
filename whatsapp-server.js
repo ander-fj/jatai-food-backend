@@ -630,4 +630,4 @@ process.on('SIGINT', async () => {
 // --- START SERVER ---
 app.listen(port, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${port}`);
-  console.log('📱 Aguardando sessões do WhatsApp...');
+  console.log('📱 Aguardando sessões do WhatsApp...'); 
