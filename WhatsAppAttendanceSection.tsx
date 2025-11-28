@@ -20,7 +20,8 @@ type ConnectionStatus =
   | 'QR_CODE'
   | 'ready'
   | 'AUTH_FAILURE'
-  | 'ERROR';
+  | 'ERROR'
+  | 'logged_out';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -94,7 +95,12 @@ const WhatsAppAttendanceSection: React.FC = () => {
         const data = await statusResponse.json();
         const newStatus = data.status as ConnectionStatus || 'disconnected';
         
-        setConnectionStatus(newStatus);
+        // Tratar logged_out como disconnected para interface
+        if (newStatus === 'logged_out') {
+          setConnectionStatus('disconnected');
+        } else {
+          setConnectionStatus(newStatus);
+        }
 
         // Buscar QR code apenas se o status for QR_CODE
         if (newStatus === 'QR_CODE') {
@@ -110,7 +116,7 @@ const WhatsAppAttendanceSection: React.FC = () => {
           setIsConnecting(false);
         } else {
           setQrCode(null);
-          if (newStatus === 'ready' || newStatus === 'disconnected' || newStatus === 'ERROR') {
+          if (newStatus === 'ready' || newStatus === 'disconnected' || newStatus === 'ERROR' || newStatus === 'logged_out') {
             setIsConnecting(false);
           }
         }
@@ -255,6 +261,8 @@ const WhatsAppAttendanceSection: React.FC = () => {
         return { icon: <AlertTriangle className="h-6 w-6 text-red-500 mr-2" />, text: '❌ Falha na autenticação', color: 'text-red-600' };
       case 'ERROR':
         return { icon: <WifiOff className="h-6 w-6 text-red-500 mr-2" />, text: '⚠️ Erro na conexão', color: 'text-red-600' };
+      case 'logged_out':
+        return { icon: <LogOut className="h-6 w-6 text-orange-500 mr-2" />, text: '🔓 Desconectado (Logout)', color: 'text-orange-600', subtext: 'Sessão encerrada. Clique em Conectar para iniciar novamente.' };
       default:
         return { icon: <WifiOff className="h-6 w-6 text-gray-500 mr-2" />, text: '⚫ Desconectado', color: 'text-gray-600' };
     }
