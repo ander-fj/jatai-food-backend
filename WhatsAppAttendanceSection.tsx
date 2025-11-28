@@ -169,12 +169,19 @@ const WhatsAppAttendanceSection: React.FC = () => {
       if (response.ok) {
         toast.success('Sessão do WhatsApp desconectada com sucesso!');
         setConnectionStatus('disconnected');
+      } else if (response.status === 404) {
+        toast.info('Sessão já foi desconectada.');
+        setConnectionStatus('disconnected');
       } else {
         throw new Error(`Falha na requisição: ${response.status} ${response.statusText}`);
       }
     } catch (err: unknown) {
       console.error("Erro ao desconectar WhatsApp:", err);
-      toast.error('Erro ao desconectar. Tente novamente.');
+      if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+        toast.error('Erro de conexão com o servidor. Verifique sua internet.');
+      } else {
+        toast.error('Erro ao desconectar. Tente novamente.');
+      }
       if (err instanceof Error) {
         setError(err.message);
       }

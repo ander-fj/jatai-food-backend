@@ -154,9 +154,16 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   if (client) {
     try {
       client.removeAllListeners();
+      
+      // Aguardar um pouco antes de destruir para permitir que operações pendentes terminem
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       await client.destroy();
     } catch (e) {
-      console.error(`[Sessão ${sessionId}] Erro ao destruir cliente:`, e.message);
+      // Ignorar erros de destruição, pois o cliente já pode estar fechado
+      if (!String(e).includes('Target closed') && !String(e).includes('ProtocolError')) {
+        console.error(`[Sessão ${sessionId}] Erro ao destruir cliente:`, e.message);
+      }
     }
     delete sessions[sessionId];
   }
@@ -610,6 +617,13 @@ app.post('/api/config/update/:sessionId', async (req, res) => {
 
 // --- GLOBAL ERROR HANDLERS ---
 process.on('unhandledRejection', (reason, p) => {
+  // Ignorar erros de protocol após logout (são esperados)
+  if (reason && String(reason).includes('Target closed')) {
+    return;
+  }
+  if (reason && String(reason).includes('ProtocolError')) {
+    return;
+  }
   console.error('Unhandled Rejection:', reason);
 });
 
