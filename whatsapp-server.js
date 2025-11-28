@@ -90,23 +90,18 @@ const allowedOrigins = [
   'http://localhost:5173',
 ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) callback(null, true);
-    else {
-      console.log(`[CORS] Origem bloqueada: ${origin}`);
+// Configuração de CORS simplificada e mais robusta
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Permite requisições sem 'origin' (ex: Postman, apps mobile) e de origens na lista
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
       callback(new Error('Not allowed by CORS'));
     }
-  },
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
-  credentials: true,
-  optionsSuccessStatus: 200,
-  preflightContinue: false
-}));
-
-app.options('*', cors());
+  }
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // --- ARMAZENAMENTO DE SESSÕES ---
