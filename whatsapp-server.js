@@ -104,10 +104,10 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 // Função de limpeza de sessão (melhorada)
 const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   console.log(`[Sessão ${sessionId}] 🧹 Limpando sessão... (Remover Auth: ${forceRemoveAuth})`);
+  const client = sessions[sessionId] ? sessions[sessionId].client : null;
+
   try {
     await remove(ref(database, `tenants/${sessionId}/session`));
-  } catch (e) {
-    console.error(`[Sessão ${sessionId}] Erro ao remover status no Firebase:`, e);
   }
 
   if (sessions[sessionId] && sessions[sessionId].client) {
@@ -139,6 +139,7 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   }
 };
 
+
 // --- Inicialização do WhatsApp Client (robusta) ---
 const initializeWhatsAppClient = async (sessionId, opts = {}) => {
   if (activeInitializations[sessionId]) { // Lock principal baseado em Promise
@@ -146,6 +147,7 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
     return activeInitializations[sessionId];
   }
 
+  // A Promise de inicialização é criada e armazenada IMEDIATAMENTE.
   const initPromise = (async () => {
     if (sessions[sessionId] && sessions[sessionId].status === 'ready' && sessions[sessionId].client) {
       try {
@@ -160,16 +162,6 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
         delete sessions[sessionId];
       }
     }
-
-
-    const sessionRef = ref(database, `tenants/${sessionId}/session`);
-    try {
-      await set(sessionRef, { status: 'INITIALIZING' });
-    } catch (e) {
-      console.warn(`[Sessão ${sessionId}] ⚠️ Falha ao setar status INITIALIZING no Firebase:`, e.message || e);
-    }
-
-    reconnectionAttempts[sessionId] = reconnectionAttempts[sessionId] || 0;
 
     const createClientInstance = () => {
       const client = new Client({
@@ -193,11 +185,19 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       return client;
     };
 
+    // CRIAÇÃO DO CLIENTE E ANEXAÇÃO DE LISTENERS OCORRE APENAS UMA VEZ.
     const client = createClientInstance();
     sessions[sessionId] = { client, status: 'INITIALIZING', qrAttempts: 0 };
 
+    const sessionRef = ref(database, `tenants/${sessionId}/session`);
+    try {
+      await set(sessionRef, { status: 'INITIALIZING' });
+    } catch (e) {
+      console.warn(`[Sessão ${sessionId}] ⚠️ Falha ao setar status INITIALIZING no Firebase:`, e.message || e);
+    }
+
     // QR event
-    client.on('qr', async (qr) => {
+    client.once('qr', async (qr) => { // Usar .once() para o primeiro QR é mais seguro.
       try {
         // Verificação dupla: status em memória E no Firebase para evitar race conditions.
         const snapshot = await get(sessionRef);
@@ -216,11 +216,11 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       }
     });
 
-    client.on('authenticated', () => {
+    client.once('authenticated', () => {
       console.log(`[Sessão ${sessionId}] ✅ Autenticado com sucesso!`);
     });
 
-    client.on('ready', async () => {
+    client.once('ready', async () => {
       try {
         console.log(`[Sessão ${sessionId}] ✅ Cliente conectado e pronto!`);
         await set(sessionRef, { status: 'ready', connectedAt: new Date().toISOString() });
@@ -276,7 +276,7 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       }
     });
 
-    client.on('disconnected', async (reason) => {
+    client.once('disconnected', async (reason) => {
       try {
         console.log(`[Sessão ${sessionId}] ❌ Cliente desconectado. Razão: ${reason}`);
 
@@ -339,7 +339,7 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       }
     });
 
-    client.on('auth_failure', async (msg) => {
+    client.once('auth_failure', async (msg) => {
       console.error(`[Sessão ${sessionId}] ❌ Falha na autenticação:`, msg);
       await set(sessionRef, { status: 'AUTH_FAILURE', error: msg });
       await cleanupSession(sessionId, true); // Falha de autenticação sempre requer limpeza completa.
@@ -352,6 +352,7 @@ const initializeWhatsAppClient = async (sessionId, opts = {}) => {
       try {
         console.log(`[Sessão ${sessionId}] 🚀 Inicializando cliente (tentativa ${attempt}/${MAX_INIT_ATTEMPTS})...`);
         await client.initialize();
+        // A promessa só resolve aqui, após o sucesso da inicialização.
         return sessions[sessionId];
       } catch (err) {
         console.error(`[Sessão ${sessionId}] ❌ Erro na inicialização (tentativa ${attempt}):`, err && err.message ? err.message : err);
