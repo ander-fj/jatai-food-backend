@@ -198,21 +198,32 @@ const startHeartbeat = (sessionId) => {
 // --- LISTENERS DE CICLO ---
 const attachLifecycleListeners = (client, sessionId) => {
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
+  let readyDetected = false;
 
-  // Usar 'on' para QR para permitir múltiplas tentativas
   client.on('qr', async (qr) => {
-    const session = sessions[sessionId];
-    if (!session) return;
-    
-    session.qrAttempts++;
-    const qrUrl = await qrcode.toDataURL(qr);
+    try {
+      const session = sessions[sessionId];
+      if (!session) return;
 
-    console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts}`);
-    await set(sessionRef, {
-      status: 'QR_CODE',
-      qr: qrUrl,
-      attempt: session.qrAttempts
-    });
+      if (readyDetected) {
+        console.warn(`[Sessão ${sessionId}] ⚠️ QR regenerado após 'ready'. Múltiplas conexões detectadas. Encerrando.`);
+        await cleanupSession(sessionId, true);
+        await set(sessionRef, { status: 'logged_out', reason: 'multiple_connections' });
+        return;
+      }
+
+      session.qrAttempts++;
+      const qrUrl = await qrcode.toDataURL(qr);
+
+      console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts}`);
+      await set(sessionRef, {
+        status: 'QR_CODE',
+        qr: qrUrl,
+        attempt: session.qrAttempts
+      });
+    } catch (error) {
+      console.error(`[Sessão ${sessionId}] Erro no handler de QR:`, error);
+    }
   });
 
   client.once('authenticated', () => {
@@ -220,16 +231,22 @@ const attachLifecycleListeners = (client, sessionId) => {
   });
 
   client.once('ready', async () => {
-    console.log(`[Sessão ${sessionId}] ✅ Cliente pronto`);
-    await set(sessionRef, { status: 'ready' });
-    sessions[sessionId].status = 'ready';
-    sessions[sessionId].qrAttempts = 0;
-    sessions[sessionId].reconnectAttempts = 0;
-    sessions[sessionId].lastActivity = Date.now();
-
-    // Iniciar heartbeat
-    if (!sessions[sessionId].heartbeatInterval) {
-      sessions[sessionId].heartbeatInterval = startHeartbeat(sessionId);
+    try {
+      console.log(`[Sessão ${sessionId}] ✅ Cliente pronto`);
+      readyDetected = true;
+      await set(sessionRef, { status: 'ready' });
+      const session = sessions[sessionId];
+      if (session) {
+        session.status = 'ready';
+        session.qrAttempts = 0;
+        session.reconnectAttempts = 0;
+        session.lastActivity = Date.now();
+        if (!session.heartbeatInterval) {
+          session.heartbeatInterval = startHeartbeat(sessionId);
+        }
+      }
+    } catch (error) {
+      console.error(`[Sessão ${sessionId}] Erro no handler de 'ready':`, error);
     }
   });
 
@@ -240,7 +257,6 @@ const attachLifecycleListeners = (client, sessionId) => {
     console.log(`[Sessão ${sessionId}] 📩 Mensagem de ${chatId}: "${message.body}"`);
 
     try {
-      // Verificar se o cliente ainda está válido
       if (!await isClientValid(sessionId)) {
         console.warn(`[Sessão ${sessionId}] Cliente inválido ao receber mensagem`);
         return;
@@ -270,7 +286,9 @@ const attachLifecycleListeners = (client, sessionId) => {
       const text = result.response.text();
 
       await message.reply(text);
-      sessions[sessionId].lastActivity = Date.now();
+      if (sessions[sessionId]) {
+        sessions[sessionId].lastActivity = Date.now();
+      }
 
     } catch (err) {
       console.error(`[Sessão ${sessionId}] Erro IA:`, err);
@@ -282,37 +300,44 @@ const attachLifecycleListeners = (client, sessionId) => {
     }
   });
 
-  // Usar 'on' em vez de 'once' para capturar múltiplas desconexões
   client.on('disconnected', async (reason) => {
-    console.log(`[Sessão ${sessionId}] ❌ Desconectado: ${reason}`);
+    try {
+      console.log(`[Sessão ${sessionId}] ❌ Desconectado: ${reason}`);
+      readyDetected = false;
 
-    if (String(reason).toUpperCase() === 'LOGOUT') {
-      console.log(`[Sessão ${sessionId}] Logout detectado, limpando sessão...`);
-      await cleanupSession(sessionId, true);
-      await set(sessionRef, { status: 'logged_out' });
-      return;
-    }
+      if (String(reason).toUpperCase() === 'LOGOUT') {
+        console.log(`[Sessão ${sessionId}] Logout detectado, limpando sessão permanentemente.`);
+        await cleanupSession(sessionId, true);
+        await set(sessionRef, { status: 'logged_out' });
+        return;
+      }
 
-    // Para outras desconexões, tentar reconectar
-    await cleanupSession(sessionId, false);
-    await set(sessionRef, { status: 'disconnected' });
+      const session = sessions[sessionId];
+      if (!session) {
+        return;
+      }
 
-    // Tentar reconectar automaticamente
-    const attempts = sessions[sessionId]?.reconnectAttempts || 0;
-    if (attempts < MAX_RECONNECTION_ATTEMPTS) {
-      console.log(`[Sessão ${sessionId}] Tentando reconectar (${attempts + 1}/${MAX_RECONNECTION_ATTEMPTS})...`);
-      
-      reconnectionTimers[sessionId] = setTimeout(() => {
-        initializeWhatsAppClient(sessionId)
-          .then(() => console.log(`[Sessão ${sessionId}] Reconexão bem-sucedida`))
-          .catch(e => console.error(`[Sessão ${sessionId}] Falha na reconexão:`, e));
-      }, RECONNECTION_DELAY * (attempts + 1)); // Backoff exponencial
-    } else {
-      console.error(`[Sessão ${sessionId}] Máximo de tentativas de reconexão atingido`);
+      const attempts = session.reconnectAttempts || 0;
+      if (attempts < MAX_RECONNECTION_ATTEMPTS) {
+        session.reconnectAttempts = attempts + 1;
+        const delay = RECONNECTION_DELAY * (attempts + 1);
+        console.log(`[Sessão ${sessionId}] Tentando reconectar (${session.reconnectAttempts}/${MAX_RECONNECTION_ATTEMPTS}) em ${delay / 1000}s...`);
+        
+        await cleanupSession(sessionId, false);
+        
+        reconnectionTimers[sessionId] = setTimeout(() => {
+          initializeWhatsAppClient(sessionId)
+            .catch(e => console.error(`[Sessão ${sessionId}] Falha na reconexão agendada:`, e));
+        }, delay);
+      } else {
+        console.error(`[Sessão ${sessionId}] Máximo de tentativas de reconexão atingido. Limpando permanentemente.`);
+        await cleanupSession(sessionId, true);
+      }
+    } catch (error) {
+      console.error(`[Sessão ${sessionId}] Erro grave no handler de desconexão:`, error);
     }
   });
 
-  // Listener para erros
   client.on('error', (err) => {
     console.error(`[Sessão ${sessionId}] Erro do cliente:`, err);
   });
