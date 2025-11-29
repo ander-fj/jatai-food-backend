@@ -146,16 +146,30 @@ const QR_READY_TIMEOUT = 60000; // 1 minuto para atingir ready
 const INIT_COOLDOWN = 5000; // Aguardar 5 segundos antes de reconectar
 
 // --- SISTEMA IA ---
-const createSystemInstruction = (config) => `
+const createSystemInstruction = (config) => {
+  const menu = config.menuUrl ? config.menuUrl : `
+Cardápio Jataí Food:
+- Pizza de Calabresa: R$ 40,00
+- Pizza de Mussarela: R$ 38,00
+- Pizza de Frango com Catupiry: R$ 45,00
+- Hambúrguer Clássico: R$ 25,00
+- X-Bacon: R$ 28,00
+- Batata Frita: R$ 15,00
+- Refrigerante Lata: R$ 5,00
+- Água: R$ 3,00
+`;
+
+  return `
   Você é o assistente virtual do restaurante ${config.restaurantName || 'Nosso Restaurante'}!
   Nome: Jataí 🍕🤖
   - Seja simpático, rápido, informal e use emojis
-  - Horário: ${config.hours || 'Não informado'}
-  - Endereço: ${config.address || 'Não informado'}
-  - Cardápio: ${config.menuUrl || 'Não informado'}
-  - Telefone: ${config.phoneNumber || 'Não informado'}
+  - Horário: ${config.hours || 'Consulte nosso horário de funcionamento.'}
+  - Endereço: ${config.address || 'Peça nosso endereço para entrega ou retirada.'}
+  - Cardápio: ${menu}
+  - Telefone: ${config.phoneNumber || 'Peça nosso número de telefone para contato.'}
   Nunca invente informações.
 `;
+};
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -258,6 +272,12 @@ const attachLifecycleListeners = (client, sessionId) => {
       return;
     }
     
+    // Adicionado para evitar QR em sessão pronta
+    if (session.status === 'ready') {
+      console.log(`[Sessão ${sessionId}] ⚠️  QR ignorado, sessão já está pronta.`);
+      return;
+    }
+
     qrCount++;
     session.qrAttempts++;
     const qrUrl = await qrcode.toDataURL(qr);
@@ -422,9 +442,7 @@ const attachLifecycleListeners = (client, sessionId) => {
 
     if (String(reason).toUpperCase() === 'LOGOUT') {
       console.log(`[Sessão ${sessionId}] Logout detectado, limpando sessão...`);
-      // Alterado para 'false' para não remover os arquivos de autenticação.
-      // Isso pode permitir uma reconexão sem novo QR code em alguns casos.
-      await cleanupSession(sessionId, false);
+      await cleanupSession(sessionId, false); // Alterado de true para false
       await set(sessionRef, { status: 'logged_out' });
       return;
     }
