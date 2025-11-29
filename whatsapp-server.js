@@ -80,6 +80,14 @@ const database = getDatabase(firebaseApp);
 const app = express();
 const port = process.env.PORT || 3001;
 
+const allowedOrigins = [
+  'https://www.jataifood.com.br',
+  'https://jataifood.com.br',
+  'https://jataifood.vercel.app', // Adicionado para o frontend Vercel
+  'https://jatai-food-backend-production.up.railway.app/',
+  'http://localhost:5173',
+];
+
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
