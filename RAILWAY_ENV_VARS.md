@@ -1,29 +1,23 @@
 # ⚙️ Variáveis de Ambiente para Railway
 
 Copie e cole estas variáveis no Railway Dashboard → Variables:
-
-<<<<<<< HEAD
-
 ```
-=======
+NODE_ENV=production
+PORT=10000
+SESSION_PATH=/app/data/wwebjs_auth
+
+# Gemini AI - NUNCA COLOQUE A CHAVE REAL AQUI
+GEMINI_API_KEY=SUA_NOVA_CHAVE_GEMINI_AQUI
+GEMINI_MODEL_NAME=gemini-2.5-flash
+
+# Firebase - NUNCA COLOQUE AS CHAVES REAIS AQUI
+FIREBASE_API_KEY=SUA_CHAVE_FIREBASE_API_AQUI
+FIREBASE_AUTH_DOMAIN=SEU_DOMINIO_FIREBASE_AQUI
+FIREBASE_DATABASE_URL=SUA_URL_DATABASE_FIREBASE_AQUI
+FIREBASE_PROJECT_ID=SEU_ID_PROJETO_FIREBASE_AQUI
+FIREBASE_STORAGE_BUCKET=SEU_STORAGE_BUCKET_FIREBASE_AQUI
+FIREBASE_MESSAGING_SENDER_ID=SEU_SENDER_ID_FIREBASE_AQUI
+FIREBASE_APP_ID=SEU_APP_ID_FIREBASE_AQUI
 ```
 
->>>>>>> d8cc01fafcc2a36221c43fa5ec6bdc2a88ee175e
-
-⚠️ **IMPORTANTE:** 
-Se você tiver o `FIREBASE_APP_ID` correto no Render, substitua acima. 
-Se não tiver, você pode obter ele:
-1. Acesse https://console.firebase.google.com
-2. Selecione o projeto `dhl-teste-327e8`
-3. Vá em Configurações do Projeto → Aplicativos
-4. Copie o `App ID`
-
----
-
-## 📝 Como adicionar no Railway
-
-1. No dashboard do projeto Railway
-2. Clique na aba **Variables**
-3. Cole TODAS as variáveis acima (uma por linha)
-4. Clique em "Add" para cada uma
-5. O Railway fará redeploy automático
+⚠️ **IMPORTANTE:** Este arquivo é apenas um modelo. As chaves reais e secretas devem ser configuradas **apenas** no painel do Railway, nunca salvas em arquivos do projeto.
