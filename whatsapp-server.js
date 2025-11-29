@@ -228,13 +228,17 @@ const attachLifecycleListeners = (client, sessionId) => {
 
   client.on('qr', async (qr) => {
     const session = sessions[sessionId];
-    if (!session) return;
+    if (!session) {
+      console.log(`[Sessão ${sessionId}] ⚠️  QR recebido mas sessão não existe mais`);
+      return;
+    }
     
     qrCount++;
     session.qrAttempts++;
     const qrUrl = await qrcode.toDataURL(qr);
 
-    console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts}`);
+    const currentStatus = session.status;
+    console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts} (Status atual: ${currentStatus})`);
 
     await set(sessionRef, {
       status: 'QR_CODE',
@@ -345,7 +349,6 @@ const attachLifecycleListeners = (client, sessionId) => {
 
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Desconectado: ${reason}`);
-    readyDetected = false;
 
     if (String(reason).toUpperCase() === 'LOGOUT') {
       console.log(`[Sessão ${sessionId}] Logout detectado, limpando sessão...`);
@@ -508,12 +511,15 @@ app.get('/api/whatsapp/qr/:sessionId', async (req, res) => {
 app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
 
+  console.log(`[Sessão ${sessionId}] 📞 Requisição /start recebida`);
+
   const now = Date.now();
   const WINDOW = 10000;
 
   if (startRequestTimestamps[sessionId]) {
     const delta = now - startRequestTimestamps[sessionId];
     if (delta < WINDOW) {
+      console.log(`[Sessão ${sessionId}] ⏰ Requisição bloqueada - aguardar ${Math.ceil((WINDOW - delta) / 1000)}s`);
       return res.status(429).json({
         success: false,
         message: `Espere ${Math.ceil((WINDOW - delta) / 1000)} segundos para tentar novamente`
@@ -523,16 +529,24 @@ app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
 
   startRequestTimestamps[sessionId] = now;
 
+  // Verificar se já está inicializando
+  if (globalInitLock[sessionId] || activeInitializations[sessionId]) {
+    console.log(`[Sessão ${sessionId}] ⚠️  Inicialização já em andamento`);
+    return res.json({ success: true, message: 'Inicialização já em andamento' });
+  }
+
+  // Verificar se já está conectado
+  const isValid = await isClientValid(sessionId);
+  if (isValid) {
+    console.log(`[Sessão ${sessionId}] ✅ Já está conectado`);
+    return res.json({ success: true, message: 'Sessão já conectada' });
+  }
+
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
   const snap = await get(sessionRef);
   const fbStatus = snap.exists() ? snap.val().status : 'disconnected';
 
-  if (fbStatus === 'ready' && sessions[sessionId]) {
-    const isValid = await isClientValid(sessionId);
-    if (isValid) {
-      return res.json({ success: true, message: 'Sessão já conectada' });
-    }
-  }
+  console.log(`[Sessão ${sessionId}] Status atual: ${fbStatus}`);
 
   console.log(`[Sessão ${sessionId}] Iniciando inicialização...`);
 
