@@ -227,12 +227,11 @@ const attachLifecycleListeners = (client, sessionId) => {
   client.on('qr', async (qr) => {
     const session = sessions[sessionId];
     if (!session) return;
-
-    qrCount++;
+    
     session.qrAttempts++;
     const qrUrl = await qrcode.toDataURL(qr);
 
-    console.log(`[Sessão ${sessionId}] QR gerado #${qrCount} (Status atual: ${session.status})`);
+    console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts} (Status atual: ${session.status})`);
     await set(sessionRef, {
       status: 'QR_CODE',
       qr: qrUrl,
