@@ -1,6 +1,7 @@
 // --- IMPORTS ---
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios'); // Adicionado para buscar o cardápio
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
 const qrcode = require('qrcode');
@@ -146,18 +147,33 @@ const QR_READY_TIMEOUT = 60000; // 1 minuto para atingir ready
 const INIT_COOLDOWN = 5000; // Aguardar 5 segundos antes de reconectar
 
 // --- SISTEMA IA ---
-const createSystemInstruction = (config) => {
-  const menu = config.menuUrl ? config.menuUrl : `
-Cardápio Jataí Food:
-- Pizza de Calabresa: R$ 40,00
-- Pizza de Mussarela: R$ 38,00
-- Pizza de Frango com Catupiry: R$ 45,00
-- Hambúrguer Clássico: R$ 25,00
-- X-Bacon: R$ 28,00
-- Batata Frita: R$ 15,00
-- Refrigerante Lata: R$ 5,00
-- Água: R$ 3,00
-`;
+const createSystemInstruction = async (config) => {
+  let menuContent = `
+  Cardápio Jataí Food:
+  - Pizza de Calabresa: R$ 40,00
+  - Pizza de Mussarela: R$ 38,00
+  - Pizza de Frango com Catupiry: R$ 45,00
+  - Hambúrguer Clássico: R$ 25,00
+  - X-Bacon: R$ 28,00
+  - Batata Frita: R$ 15,00
+  - Refrigerante Lata: R$ 5,00
+  - Água: R$ 3,00
+  `;
+
+  if (config.menuUrl) {
+    try {
+      console.log(`[IA] Buscando cardápio de: ${config.menuUrl}`);
+      // Usamos um User-Agent para simular um navegador e evitar bloqueios
+      const response = await axios.get(config.menuUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
+      });
+      // Extrai o texto do HTML, remove tags e espaços extras
+      menuContent = response.data.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      console.log('[IA] Cardápio online carregado com sucesso.');
+    } catch (error) {
+      console.error(`[IA] Falha ao buscar cardápio da URL. Usando cardápio padrão. Erro: ${error.message}`);
+    }
+  }
 
   return `
   Você é o assistente virtual do restaurante ${config.restaurantName || 'Nosso Restaurante'}!
@@ -165,7 +181,7 @@ Cardápio Jataí Food:
   - Seja simpático, rápido, informal e use emojis
   - Horário: ${config.hours || 'Consulte nosso horário de funcionamento.'}
   - Endereço: ${config.address || 'Peça nosso endereço para entrega ou retirada.'}
-  - Cardápio: ${menu}
+  - Cardápio: ${menuContent}
   - Telefone: ${config.phoneNumber || 'Peça nosso número de telefone para contato.'}
   Nunca invente informações.
 `;
@@ -340,7 +356,7 @@ const attachLifecycleListeners = (client, sessionId) => {
       if (!sessionModels[sessionId]) {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash";
-        const systemInstruction = createSystemInstruction(config);
+        const systemInstruction = await createSystemInstruction(config); // Agora é assíncrono
 
         sessionModels[sessionId] = genAI.getGenerativeModel({
           model: modelName,
@@ -442,7 +458,7 @@ const attachLifecycleListeners = (client, sessionId) => {
 
     if (String(reason).toUpperCase() === 'LOGOUT') {
       console.log(`[Sessão ${sessionId}] Logout detectado, limpando sessão...`);
-      await cleanupSession(sessionId, false); // Alterado de true para false
+      await cleanupSession(sessionId, true); // Revertido para 'true' para garantir limpeza completa
       await set(sessionRef, { status: 'logged_out' });
       return;
     }
