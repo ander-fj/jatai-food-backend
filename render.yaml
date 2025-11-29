@@ -3,13 +3,19 @@ services:
     name: jatai-food-backend
     env: node
     region: oregon
-    plan: free
+    plan: starter  # Mudado de free para starter ($7/mês) para suportar disk
     buildCommand: npm install
     startCommand: node whatsapp-server.js
     healthCheckPath: /health
+    disk:
+      name: whatsapp-sessions
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
+      - key: SESSION_PATH
+        value: /var/data/wwebjs_auth
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL_NAME
