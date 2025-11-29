@@ -12,8 +12,25 @@ const fs = require('fs');
 const path = require('path');
 
 // --- CONFIGURAÇÃO DE SESSÃO PERSISTENTE ---
-let SESSION_BASE_PATH = process.env.SESSION_PATH || '/var/data/wwebjs_auth';
+// Railway: /app/data é o volume persistente
+// Render: /var/data é o volume persistente  
+// Local: ./wwebjs_auth
+const isRailway = process.env.RAILWAY_ENVIRONMENT !== undefined;
+const isRender = process.env.RENDER !== undefined;
+
+let SESSION_BASE_PATH;
+if (isRailway) {
+  SESSION_BASE_PATH = '/app/data/wwebjs_auth';
+} else if (isRender) {
+  SESSION_BASE_PATH = process.env.SESSION_PATH || '/var/data/wwebjs_auth';
+} else {
+  SESSION_BASE_PATH = process.env.SESSION_PATH || path.join(__dirname, '.wwebjs_auth');
+}
+
 let sessionPathResolved = SESSION_BASE_PATH;
+
+console.log(`[Sistema] Plataforma detectada: ${isRailway ? 'Railway' : isRender ? 'Render' : 'Local'}`);
+console.log(`[Sistema] Caminho de sessão configurado: ${SESSION_BASE_PATH}`);
 
 const ensureDir = (p) => {
   try {
@@ -86,6 +103,13 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
 ];
+
+// Adicionar automaticamente a URL do Railway se disponível
+if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+  allowedOrigins.push(`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
+}
+
+console.log(`[CORS] Origens permitidas:`, allowedOrigins);
 
 app.use(cors({
   origin: function (origin, callback) {
