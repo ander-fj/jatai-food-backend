@@ -223,15 +223,22 @@ const startHeartbeat = (sessionId) => {
 const attachLifecycleListeners = (client, sessionId) => {
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
 
-  // Usar 'on' para QR para permitir múltiplas tentativas
   client.on('qr', async (qr) => {
     const session = sessions[sessionId];
     if (!session) return;
+
+    // Se recebermos um QR enquanto pensávamos que estávamos prontos, significa que fomos desconectados.
+    if (session.status === 'ready') {
+      console.warn(`[Sessão ${sessionId}] QR recebido inesperadamente. Tratando como desconexão forçada.`);
+    }
     
+    session.status = 'QR_CODE'; // Atualiza o status local para refletir a necessidade de um novo QR
     session.qrAttempts++;
     const qrUrl = await qrcode.toDataURL(qr);
 
     console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts} (Status atual: ${session.status})`);
+    
+    // Garante que o status no Firebase seja 'QR_CODE'
     await set(sessionRef, {
       status: 'QR_CODE',
       qr: qrUrl,
@@ -242,14 +249,20 @@ const attachLifecycleListeners = (client, sessionId) => {
   client.once('ready', async () => {
     console.log(`[Sessão ${sessionId}] ✅ Cliente pronto`);
     await set(sessionRef, { status: 'ready' });
-    sessions[sessionId].status = 'ready';
-    sessions[sessionId].qrAttempts = 0;
-    sessions[sessionId].reconnectAttempts = 0;
-    sessions[sessionId].lastActivity = Date.now();
+    
+    if (sessions[sessionId]) {
+        sessions[sessionId].status = 'ready';
+        sessions[sessionId].qrAttempts = 0;
+        sessions[sessionId].lastActivity = Date.now();
 
-    // Iniciar heartbeat
-    if (!sessions[sessionId].heartbeatInterval) {
-      sessions[sessionId].heartbeatInterval = startHeartbeat(sessionId);
+        // Limpa o contador de tentativas de reconexão em caso de sucesso
+        reconnectionAttempts[sessionId] = 0;
+
+        // Iniciar heartbeat e limpar o antigo se existir
+        if (sessions[sessionId].heartbeatInterval) {
+            clearInterval(sessions[sessionId].heartbeatInterval);
+        }
+        sessions[sessionId].heartbeatInterval = startHeartbeat(sessionId);
     }
   });
 
@@ -309,33 +322,42 @@ const attachLifecycleListeners = (client, sessionId) => {
     }
   });
 
-  // Usar 'on' em vez de 'once' para capturar múltiplas desconexões
   client.on('disconnected', async (reason) => {
     console.log(`[Sessão ${sessionId}] ❌ Desconectado: ${reason}`);
 
-    if (String(reason).toUpperCase() === 'LOGOUT') {
-      console.log(`[Sessão ${sessionId}] Logout detectado, limpando sessão...`);
-      await cleanupSession(sessionId, true);
+    // Limpa o heartbeat para evitar que continue rodando
+    if (sessions[sessionId] && sessions[sessionId].heartbeatInterval) {
+        clearInterval(sessions[sessionId].heartbeatInterval);
+    }
+
+    if (String(reason).toUpperCase() === 'LOGOUT' || reason === 'LOGGED_OUT') {
+      console.log(`[Sessão ${sessionId}] Logout detectado, limpando sessão permanentemente...`);
+      await cleanupSession(sessionId, true); // forceRemoveAuth = true
       await set(sessionRef, { status: 'logged_out' });
+      reconnectionAttempts[sessionId] = 0; // Reseta tentativas
       return;
     }
 
-    // Para outras desconexões, tentar reconectar
-    await cleanupSession(sessionId, false);
+    // Para outras desconexões (ex: falha de rede), tentar reconectar
+    console.log(`[Sessão ${sessionId}] Desconexão temporária. Tentando reconectar...`);
+    await cleanupSession(sessionId, false); // Limpa o cliente atual, mas mantém a autenticação
     await set(sessionRef, { status: 'disconnected' });
 
-    // Tentar reconectar automaticamente
-    const attempts = sessions[sessionId]?.reconnectAttempts || 0;
+    const attempts = (reconnectionAttempts[sessionId] || 0);
     if (attempts < MAX_RECONNECTION_ATTEMPTS) {
-      console.log(`[Sessão ${sessionId}] Tentando reconectar (${attempts + 1}/${MAX_RECONNECTION_ATTEMPTS})...`);
+      reconnectionAttempts[sessionId] = attempts + 1;
+      console.log(`[Sessão ${sessionId}] Tentativa de reconexão #${reconnectionAttempts[sessionId]} em ${RECONNECTION_DELAY / 1000}s...`);
       
+      // Agenda a reconexão
       reconnectionTimers[sessionId] = setTimeout(() => {
+        console.log(`[Sessão ${sessionId}] Iniciando tentativa de reconexão...`);
         initializeWhatsAppClient(sessionId)
-          .then(() => console.log(`[Sessão ${sessionId}] Reconexão bem-sucedida`))
-          .catch(e => console.error(`[Sessão ${sessionId}] Falha na reconexão:`, e));
-      }, RECONNECTION_DELAY * (attempts + 1)); // Backoff exponencial
+          .catch(e => console.error(`[Sessão ${sessionId}] Falha na tentativa de reconexão:`, e));
+      }, RECONNECTION_DELAY);
     } else {
-      console.error(`[Sessão ${sessionId}] Máximo de tentativas de reconexão atingido`);
+      console.error(`[Sessão ${sessionId}] Máximo de ${MAX_RECONNECTION_ATTEMPTS} tentativas de reconexão atingido. A sessão precisa ser reiniciada manualmente.`);
+      await set(sessionRef, { status: 'failed_reconnect' });
+      reconnectionAttempts[sessionId] = 0; // Reseta para o futuro
     }
   });
 
@@ -364,6 +386,10 @@ const initializeWhatsAppClient = async (sessionId) => {
         puppeteer: {
           headless: true,
           args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        },
+        webVersionCache: {
+          type: 'remote',
+          remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
         }
       });
 
