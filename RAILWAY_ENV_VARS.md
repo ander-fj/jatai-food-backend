@@ -2,8 +2,13 @@
 
 Copie e cole estas variáveis no Railway Dashboard → Variables:
 
+<<<<<<< HEAD
 
 ```
+=======
+```
+
+>>>>>>> d8cc01fafcc2a36221c43fa5ec6bdc2a88ee175e
 
 ⚠️ **IMPORTANTE:** 
 Se você tiver o `FIREBASE_APP_ID` correto no Render, substitua acima. 
