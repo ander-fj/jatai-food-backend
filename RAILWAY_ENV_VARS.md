@@ -3,17 +3,7 @@
 Copie e cole estas variáveis no Railway Dashboard → Variables:
 
 ```
-NODE_ENV=production
-GEMINI_API_KEY=AIzaSyD2-3zEw9OqMPDo4_05x5NVnjb77W11OJk
-GEMINI_MODEL_NAME=gemini-2.5-flash
-FIREBASE_API_KEY=AIzaSyDQ_q5pURFbmjuOlvB5RNslZUr6Y6Yo_aE
-FIREBASE_AUTH_DOMAIN=dhl-teste-327e8.firebaseapp.com
-FIREBASE_DATABASE_URL=https://dhl-teste-327e8-default-rtdb.firebaseio.com
-FIREBASE_PROJECT_ID=dhl-teste-327e8
-FIREBASE_STORAGE_BUCKET=dhl-teste-327e8.appspot.com
-FIREBASE_MESSAGING_SENDER_ID=595095451120
-FIREBASE_APP_ID=1:595095451120:web:YOUR_APP_ID_HERE
-```
+
 
 ⚠️ **IMPORTANTE:** 
 Se você tiver o `FIREBASE_APP_ID` correto no Render, substitua acima. 
