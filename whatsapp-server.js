@@ -100,6 +100,7 @@ const allowedOrigins = [
   'https://jataifood.com.br',
   'https://jataifood.vercel.app',
   'https://jatai-food-backend.onrender.com',
+  'https://jatai-food-backend-production.up.railway.app',
   'http://localhost:5173',
   'http://localhost:5174',
 ];
