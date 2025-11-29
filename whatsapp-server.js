@@ -309,12 +309,21 @@ const attachLifecycleListeners = (client, sessionId) => {
       const result = await chat.sendMessage(message.body);
       const text = result.response.text();
 
+      if (!await isClientValid(sessionId)) {
+        console.warn(`[Sessão ${sessionId}] Cliente desconectado antes de enviar a resposta da IA. Abortando.`);
+        return;
+      }
+
       await message.reply(text);
       sessions[sessionId].lastActivity = Date.now();
 
     } catch (err) {
       console.error(`[Sessão ${sessionId}] Erro IA:`, err);
       try {
+        if (!await isClientValid(sessionId)) {
+            console.warn(`[Sessão ${sessionId}] Cliente desconectado antes de enviar a mensagem de erro. Abortando.`);
+            return;
+        }
         await message.reply('Desculpe, tive um problema ao processar sua mensagem.');
       } catch (replyErr) {
         console.error(`[Sessão ${sessionId}] Erro ao enviar mensagem de erro:`, replyErr);
