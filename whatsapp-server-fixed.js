@@ -81,7 +81,7 @@ const port = process.env.PORT || 3001;
 const allowedOrigins = [
   'https://www.jataifood.com.br',
   'https://jataifood.com.br',
-  'https://jatai-food-backend.onrender.com',
+  'https://jatai-food-backend-production.up.railway.app',
   'http://localhost:5173',
 ];
 
