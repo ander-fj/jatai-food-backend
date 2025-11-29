@@ -5,7 +5,7 @@ Copie e cole estas variáveis no Railway Dashboard → Variables:
 ```
 NODE_ENV=production
 GEMINI_API_KEY=AIzaSyD2-3zEw9OqMPDo4_05x5NVnjb77W11OJk
-GEMINI_MODEL_NAME=gemini-2.0-flash
+GEMINI_MODEL_NAME=gemini-2.5-flash
 FIREBASE_API_KEY=AIzaSyDQ_q5pURFbmjuOlvB5RNslZUr6Y6Yo_aE
 FIREBASE_AUTH_DOMAIN=dhl-teste-327e8.firebaseapp.com
 FIREBASE_DATABASE_URL=https://dhl-teste-327e8-default-rtdb.firebaseio.com

@@ -19,7 +19,7 @@ SESSION_PATH=/app/data/wwebjs_auth
 
 # Gemini AI
 GEMINI_API_KEY=sua_chave_aqui
-GEMINI_MODEL_NAME=gemini-2.0-flash
+GEMINI_MODEL_NAME=gemini-2.5-flash
 
 # Firebase
 FIREBASE_API_KEY=sua_chave_aqui
