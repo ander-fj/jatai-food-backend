@@ -342,30 +342,75 @@ const attachLifecycleListeners = (client, sessionId) => {
         )
       ]);
 
-      const text = result.response.text();
+      console.log(`[Sessão ${sessionId}] Resposta da IA recebida.`);
+      const response = result.response;
+      if (!response) {
+          console.error(`[Sessão ${sessionId}] Erro: A resposta da IA é nula ou indefinida.`);
+          await message.reply('Desculpe, não consegui gerar uma resposta.');
+          return;
+      }
+
+      const text = response.text();
+      console.log(`[Sessão ${sessionId}] Texto da IA: "${text}"`);
 
       if (!await isClientValid(sessionId)) {
         console.warn(`[Sessão ${sessionId}] ⚠️  Cliente desconectou antes de enviar resposta`);
         return;
       }
+      
+      try {
+        await message.reply(text);
+      } catch (replyErr) {
+        console.error(`[Sessão ${sessionId}] Erro específico ao tentar enviar a resposta (message.reply):`, replyErr);
+        // Se o erro de resposta for um erro de puppeteer, trate-o como crítico.
+        if (isPuppeteerError(replyErr)) {
+            console.error(`[Sessão ${sessionId}] ❌ Erro crítico do Puppeteer durante o message.reply`);
+        }
+        return; // Interrompe a execução aqui, pois o envio da mensagem falhou
+      }
 
-      await message.reply(text);
       sessions[sessionId].lastActivity = Date.now();
 
     } catch (err) {
       console.error(`[Sessão ${sessionId}] Erro ao processar mensagem:`, err.message);
+      if (err.stack) {
+        console.error(`[Sessão ${sessionId}] Stack:`, err.stack);
+      }
 
       if (isPuppeteerError(err)) {
-        console.error(`[Sessão ${sessionId}] ❌ Erro crítico do Puppeteer detectado`);
+        console.error(`[Sessão ${sessionId}] ❌ Erro crítico do Puppeteer detectado. A sessão será reiniciada.`);
+        
+        if (sessions[sessionId] && sessions[sessionId].isRestarting) {
+            console.log(`[Sessão ${sessionId}] Reinicialização já em andamento.`);
+            return;
+        }
+        if(sessions[sessionId]) sessions[sessionId].isRestarting = true;
+
+        await cleanupSession(sessionId, false);
+        await set(ref(database, `tenants/${sessionId}/session`), { status: 'restarting' });
+
+        console.log(`[Sessão ${sessionId}] Agendando reinicialização em ${RECONNECTION_DELAY / 1000}s...`);
+        reconnectionTimers[sessionId] = setTimeout(() => {
+          initializeWhatsAppClient(sessionId)
+            .then(() => {
+                console.log(`[Sessão ${sessionId}] Reinicialização concluída com sucesso.`);
+                if(sessions[sessionId]) delete sessions[sessionId].isRestarting;
+            })
+            .catch(e => {
+                console.error(`[Sessão ${sessionId}] Falha na reinicialização agendada:`, e.message);
+                if(sessions[sessionId]) delete sessions[sessionId].isRestarting;
+            });
+        }, RECONNECTION_DELAY);
+
         return;
       }
 
-      if (await isClientValid(sessionId)) {
-        try {
+      try {
+        if (await isClientValid(sessionId)) {
           await message.reply('Desculpe, tive um problema ao processar sua mensagem.');
-        } catch (replyErr) {
-          console.error(`[Sessão ${sessionId}] Erro ao enviar mensagem de erro:`, replyErr.message);
         }
+      } catch (replyErr) {
+        console.error(`[Sessão ${sessionId}] Erro ao enviar mensagem de erro de fallback:`, replyErr.message);
       }
     } finally {
       delete messageProcessingLocks[messageId];
