@@ -109,7 +109,6 @@ const activeInitializations = {};
 const reconnectionAttempts = {};
 const startRequestTimestamps = {};
 const reconnectionTimers = {};
-const qrRegenerationTimers = {};
 const messageProcessingLocks = {};
 const globalInitLock = {}; // Lock global para evitar múltiplas inicializações
 
@@ -179,11 +178,6 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
     delete reconnectionTimers[sessionId];
   }
 
-  if (qrRegenerationTimers[sessionId]) {
-    clearTimeout(qrRegenerationTimers[sessionId]);
-    delete qrRegenerationTimers[sessionId];
-  }
-
   if (forceRemoveAuth) {
     const folder = path.join(sessionPathResolved, `session-${sessionId}`);
     if (fs.existsSync(folder)) {
@@ -231,7 +225,6 @@ const startHeartbeat = (sessionId) => {
 const attachLifecycleListeners = (client, sessionId) => {
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
   let qrCount = 0;
-  let readyDetected = false;
 
   client.on('qr', async (qr) => {
     const session = sessions[sessionId];
@@ -243,29 +236,11 @@ const attachLifecycleListeners = (client, sessionId) => {
 
     console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts}`);
 
-    // Se QR foi gerado APÓS a sessão estar ready, é um logout automático
-    if (readyDetected) {
-      console.warn(`[Sessão ${sessionId}] ⚠️  QR regenerado após estar ready - Múltiplas conexões detectadas`);
-      
-      if (qrRegenerationTimers[sessionId]) {
-        clearTimeout(qrRegenerationTimers[sessionId]);
-      }
-
-      qrRegenerationTimers[sessionId] = setTimeout(async () => {
-        const isValid = await isClientValid(sessionId);
-        if (!isValid) {
-          console.error(`[Sessão ${sessionId}] ❌ Confirmado: Múltiplas conexões - Desconectando`);
-          await cleanupSession(sessionId, true);
-          await set(sessionRef, { status: 'logged_out', reason: 'multiple_connections' });
-        }
-      }, 2000);
-    } else {
-      await set(sessionRef, {
-        status: 'QR_CODE',
-        qr: qrUrl,
-        attempt: session.qrAttempts
-      });
-    }
+    await set(sessionRef, {
+      status: 'QR_CODE',
+      qr: qrUrl,
+      attempt: session.qrAttempts
+    });
   });
 
   client.once('authenticated', () => {
@@ -274,7 +249,6 @@ const attachLifecycleListeners = (client, sessionId) => {
 
   client.once('ready', async () => {
     console.log(`[Sessão ${sessionId}] ✅ Cliente pronto`);
-    readyDetected = true;
     await set(sessionRef, { status: 'ready' });
     sessions[sessionId].status = 'ready';
     sessions[sessionId].qrAttempts = 0;
@@ -283,11 +257,6 @@ const attachLifecycleListeners = (client, sessionId) => {
 
     if (!sessions[sessionId].heartbeatInterval) {
       sessions[sessionId].heartbeatInterval = startHeartbeat(sessionId);
-    }
-
-    if (qrRegenerationTimers[sessionId]) {
-      clearTimeout(qrRegenerationTimers[sessionId]);
-      delete qrRegenerationTimers[sessionId];
     }
   });
 
