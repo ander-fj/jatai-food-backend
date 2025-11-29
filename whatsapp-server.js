@@ -377,7 +377,9 @@ const attachLifecycleListeners = (client, sessionId) => {
 
     if (String(reason).toUpperCase() === 'LOGOUT') {
       console.log(`[Sessão ${sessionId}] Logout detectado, limpando sessão...`);
-      await cleanupSession(sessionId, true);
+      // Alterado para 'false' para não remover os arquivos de autenticação.
+      // Isso pode permitir uma reconexão sem novo QR code em alguns casos.
+      await cleanupSession(sessionId, false);
       await set(sessionRef, { status: 'logged_out' });
       return;
     }
