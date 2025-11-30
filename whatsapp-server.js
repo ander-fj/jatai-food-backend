@@ -255,27 +255,23 @@ const attachLifecycleListeners = (sessionId, client) => {
   client.on('disconnected', async (reason) => {
     console.log(`[${sessionId}] ❌ Desconectado: ${reason}`);
 
-    // Se a razão for 'NAVIGATION', significa que outra sessão do WhatsApp Web foi aberta.
-    // Neste caso, não devemos tentar reconectar, pois causará um loop.
-    // Apenas limpamos e aguardamos o usuário iniciar manualmente.
-    if (reason === 'NAVIGATION') {
-      console.warn(`[${sessionId}] ⚠️ Desconexão por NAVEGAÇÃO. Outra sessão do WhatsApp Web pode ter sido aberta. Não haverá reconexão automática.`);
-      await writeSessionStatusToDB(sessionId, { status: 'logged_out', reason: 'NAVIGATION', updatedAt: Date.now() });
-      await cleanupSession(sessionId, true); // Força a remoção dos arquivos de autenticação para gerar um novo QR
+    // Se a razão for 'LOGOUT' ou 'NAVIGATION' (conflito de sessão), limpamos permanentemente.
+    if (String(reason).toUpperCase() === 'LOGOUT' || reason === 'NAVIGATION') {
+      console.log(`[${sessionId}] Logout ou conflito detectado. Limpando sessão permanentemente.`);
+      await writeSessionStatusToDB(sessionId, { status: 'logged_out', reason: String(reason) });
+      await cleanupSession(sessionId, true); // O 'true' remove os arquivos de autenticação.
       return;
     }
 
-    // Para outras razões, procedemos com a lógica de reconexão.
+    // Para outras razões (ex: queda de rede), tentamos reconectar.
     await writeSessionStatusToDB(sessionId, { status: 'disconnected', reason: String(reason), updatedAt: Date.now() });
 
-    // limpa memory (sem necessariamente remover auth files)
-    await cleanupSession(sessionId, false);
-
-    // tenta reconectar com backoff (se não excedeu)
+    // Tenta reconectar com backoff exponencial
     const attempts = (sessions[sessionId]?.reconnectAttempts || 0);
     if (attempts < MAX_RECONNECT_ATTEMPTS) {
       const delay = RECONNECT_BASE_DELAY * Math.pow(2, attempts);
       console.log(`[${sessionId}] Tentando reconectar em ${delay}ms (attempt ${attempts + 1})`);
+      await cleanupSession(sessionId, false); // Limpa a sessão da memória antes de tentar de novo.
       const timerId = setTimeout(() => {
         initializeWhatsAppClient(sessionId, true).catch(err => console.error(`[${sessionId}] Reconnect fail:`, err));
       }, delay);
@@ -286,6 +282,7 @@ const attachLifecycleListeners = (sessionId, client) => {
       sessions[sessionId].reconnectTimerId = timerId;
     } else {
       console.warn(`[${sessionId}] Máximo de tentativas de reconexão atingido.`);
+      await cleanupSession(sessionId, true); // Limpa permanentemente após falhar várias vezes.
       await writeSessionStatusToDB(sessionId, { status: 'disconnected_permanent', updatedAt: Date.now() });
     }
   });
@@ -305,7 +302,7 @@ const attachLifecycleListeners = (sessionId, client) => {
       }
 
       const model = sessionModels[sessionId].getGenerativeModel({
-        model: process.env.GEMINI_MODEL_NAME || 'gemini-1.5-flash',
+        model: process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash',
         systemInstruction: createSystemInstruction(cfg)
       });
 
@@ -331,13 +328,14 @@ const attachLifecycleListeners = (sessionId, client) => {
 
 // --- INITIALIZE CLIENT ---
 const initializeWhatsAppClient = async (sessionId, isReconnect = false) => {
+  console.log(`[${sessionId}] 🚀 Tentativa de inicialização. isReconnect=${isReconnect}. Chamadas ativas: ${Object.keys(activeInitializations).length}`);
   if (activeInitializations[sessionId]) {
-    console.log(`[${sessionId}] Inicialização já em andamento.`);
+    console.log(`[${sessionId}] Inicialização já em andamento. Abortando nova tentativa.`);
     return;
   }
   activeInitializations[sessionId] = true;
 
-  console.log(`[${sessionId}] 🚀 Inicializando sessão WhatsApp...`);
+  console.log(`[${sessionId}] 🚀 Iniciando sessão WhatsApp... (lock adquirido)`);
 
   // limpa qualquer cliente antigo (não remove arquivos por padrão)
   if (sessions[sessionId]) {
