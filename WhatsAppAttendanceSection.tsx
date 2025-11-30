@@ -17,9 +17,9 @@ interface WhatsAppConfig {
 type ConnectionStatus = 
   | 'disconnected'
   | 'initializing'
-  | 'QR_CODE'
+  | 'qr'
   | 'ready'
-  | 'AUTH_FAILURE'
+  | 'auth_failure'
   | 'ERROR'
   | 'logged_out';
 
@@ -102,8 +102,8 @@ const WhatsAppAttendanceSection: React.FC = () => {
           setConnectionStatus(newStatus);
         }
 
-        // Buscar QR code apenas se o status for QR_CODE
-        if (newStatus === 'QR_CODE') {
+        // Buscar QR code apenas se o status for qr
+        if (newStatus === 'qr') {
           const qrResponse = await fetch(`${API_URL}/api/whatsapp/qr/${username}`);
           if (qrResponse.ok) {
             const qrData = await qrResponse.json();
@@ -253,11 +253,11 @@ const WhatsAppAttendanceSection: React.FC = () => {
     switch (connectionStatus) {
       case 'ready':
         return { icon: <Wifi className="h-6 w-6 text-green-500 mr-2" />, text: '✅ Conectado', color: 'text-green-600', subtext: 'WhatsApp conectado e funcionando' };
-      case 'QR_CODE':
+      case 'qr':
         return { icon: <QrCode className="h-6 w-6 text-yellow-500 mr-2" />, text: '⏳ Aguardando leitura do QR Code', color: 'text-yellow-600' };
       case 'initializing':
         return { icon: <Loader className="animate-spin h-6 w-6 text-blue-500 mr-2" />, text: '🔄 Iniciando...', color: 'text-blue-600' };
-      case 'AUTH_FAILURE':
+      case 'auth_failure':
         return { icon: <AlertTriangle className="h-6 w-6 text-red-500 mr-2" />, text: '❌ Falha na autenticação', color: 'text-red-600' };
       case 'ERROR':
         return { icon: <WifiOff className="h-6 w-6 text-red-500 mr-2" />, text: '⚠️ Erro na conexão', color: 'text-red-600' };
@@ -310,7 +310,7 @@ const WhatsAppAttendanceSection: React.FC = () => {
           )}
         </div>
 
-        {connectionStatus === 'QR_CODE' && qrCode && (
+        {connectionStatus === 'qr' && qrCode && (
           <div className="mt-4 p-4 bg-white rounded-md shadow-inner flex flex-col items-center animate-fade-in">
             <h4 className="text-md font-semibold text-gray-700 mb-2">📱 Escaneie para conectar</h4>
             <img src={qrCode} alt="QR Code do WhatsApp" className="w-48 h-48 rounded-md border-2 border-gray-200" />
@@ -320,10 +320,10 @@ const WhatsAppAttendanceSection: React.FC = () => {
           </div>
         )}
 
-        {(connectionStatus === 'AUTH_FAILURE' || connectionStatus === 'ERROR') && (
+        {(connectionStatus === 'auth_failure' || connectionStatus === 'ERROR') && (
           <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 rounded">
             <p className="text-sm text-red-700">
-              {connectionStatus === 'AUTH_FAILURE' 
+              {connectionStatus === 'auth_failure' 
                 ? '❌ Falha na autenticação. Tente conectar novamente.'
                 : '⚠️ Ocorreu um erro na conexão. Verifique o console do servidor ou tente reconectar.'}
             </p>

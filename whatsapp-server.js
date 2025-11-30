@@ -254,6 +254,18 @@ const attachLifecycleListeners = (sessionId, client) => {
 
   client.on('disconnected', async (reason) => {
     console.log(`[${sessionId}] ❌ Desconectado: ${reason}`);
+
+    // Se a razão for 'NAVIGATION', significa que outra sessão do WhatsApp Web foi aberta.
+    // Neste caso, não devemos tentar reconectar, pois causará um loop.
+    // Apenas limpamos e aguardamos o usuário iniciar manualmente.
+    if (reason === 'NAVIGATION') {
+      console.warn(`[${sessionId}] ⚠️ Desconexão por NAVEGAÇÃO. Outra sessão do WhatsApp Web pode ter sido aberta. Não haverá reconexão automática.`);
+      await writeSessionStatusToDB(sessionId, { status: 'logged_out', reason: 'NAVIGATION', updatedAt: Date.now() });
+      await cleanupSession(sessionId, true); // Força a remoção dos arquivos de autenticação para gerar um novo QR
+      return;
+    }
+
+    // Para outras razões, procedemos com a lógica de reconexão.
     await writeSessionStatusToDB(sessionId, { status: 'disconnected', reason: String(reason), updatedAt: Date.now() });
 
     // limpa memory (sem necessariamente remover auth files)
