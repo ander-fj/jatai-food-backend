@@ -307,13 +307,13 @@ const attachLifecycleListeners = (sessionId, client, initializationPromise) => {
       console.log(`[${sessionId}] 📩 Mensagem de ${chatId}: "${message.body}"`);
 
       // --- LÓGICA DA IA ---
-      const configSnap = await get(ref(database, `sessions/${sessionId}/config`));
+      const configSnap = await get(ref(database, `tenants/${sessionId}/whatsappConfig`));
       const config = configSnap.exists() ? configSnap.val() : {};
 
       // Inicializa o modelo da IA para a sessão, se ainda não existir
       if (!sessionModels[sessionId]) {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash"; // Usando um modelo padrão
+        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash"; // CORREÇÃO: Usando modelo válido
         const systemInstruction = createSystemInstruction(config);
 
         sessionModels[sessionId] = genAI.getGenerativeModel({
