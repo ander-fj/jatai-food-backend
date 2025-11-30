@@ -400,12 +400,17 @@ const initializeWhatsAppClient = async (sessionId) => {
           dataPath: sessionPathResolved
         }),
         puppeteer: {
-          headless: false,
+          headless: true, // Em produção, deve ser sempre true
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu'
           ],
+          executablePath: '/usr/bin/chromium' // Adicionado para garantir que o Chromium instalado pelo Nixpacks seja usado
         }
       });
 
