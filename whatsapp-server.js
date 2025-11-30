@@ -84,6 +84,7 @@ const allowedOrigins = [
   'https://jatai-food-backend-production.up.railway.app',
   'http://localhost:5173',
   'http://localhost:5174',
+  'http://localhost:5175',
 ];
 
 app.use(cors({
@@ -105,20 +106,14 @@ const sessions = {};
 const sessionModels = {};
 const userChats = {};
 const activeInitializations = {};
-const reconnectionAttempts = {};
 const startRequestTimestamps = {};
 const reconnectionTimers = {};
-const qrRegenerationTimers = {};
-const messageProcessingLocks = {};
-const globalInitLock = {}; // Lock global para evitar múltiplas inicializações
+const sessionCleanupLocks = {}; // Para evitar condições de corrida na limpeza
 
 // --- CONSTANTES ---
 const MAX_RECONNECTION_ATTEMPTS = 3; // Reduzido para evitar loops
 const RECONNECTION_DELAY = 10000; // 10 segundos (aumentado)
 const HEARTBEAT_INTERVAL = 30000; // 30 segundos
-const MESSAGE_TIMEOUT = 30000; // 30 segundos
-const QR_READY_TIMEOUT = 60000; // 1 minuto para atingir ready
-const INIT_COOLDOWN = 5000; // Aguardar 5 segundos antes de reconectar
 
 // --- SISTEMA IA ---
 const createSystemInstruction = (config) => `
@@ -134,59 +129,68 @@ const createSystemInstruction = (config) => `
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-// --- FUNÇÕES DE VALIDAÇÃO ---
-const isPuppeteerError = (error) => {
-  const errorStr = String(error);
-  return errorStr.includes('Falha na avaliação') || 
-         errorStr.includes('ExecutionContext') ||
-         errorStr.includes('Target closed') ||
-         errorStr.includes('Session closed');
-};
-
 // --- LIMPEZA DE SESSÃO ---
 const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
-  console.log(`[Sessão ${sessionId}] 🧹 Limpando sessão... RemoveAuth=${forceRemoveAuth}`);
+  // Se uma limpeza já está em progresso, aguarda a conclusão e sai.
+  if (sessionCleanupLocks[sessionId]) {
+    console.log(`[Sessão ${sessionId}] 🧹 Aguardando limpeza anterior...`);
+    await sessionCleanupLocks[sessionId].catch(err => {
+      console.error(`[Sessão ${sessionId}] Erro na limpeza anterior (ignorado): ${err.message}`);
+    });
+    return;
+  }
 
-  const client = sessions[sessionId]?.client || null;
+  const cleanupPromise = (async () => {
+    console.log(`[Sessão ${sessionId}] 🧹 Iniciando limpeza da sessão... RemoveAuth=${forceRemoveAuth}`);
 
-  try { await remove(ref(database, `tenants/${sessionId}/session`)); } catch {}
-
-  if (client) {
-    try {
-      client.removeAllListeners();
-      await client.destroy();
-    } catch (e) {
-      console.error(`[Sessão ${sessionId}] Erro ao destruir cliente:`, e.message);
+    const session = sessions[sessionId];
+    if (!session) {
+      console.log(`[Sessão ${sessionId}] 🧹 Sessão já não existia.`);
     }
-    delete sessions[sessionId];
-  }
 
-  delete sessionModels[sessionId];
-  delete userChats[sessionId];
-  delete messageProcessingLocks[sessionId];
+    // Limpa timers de reconexão pendentes
+    if (reconnectionTimers[sessionId]) {
+      clearTimeout(reconnectionTimers[sessionId]);
+      delete reconnectionTimers[sessionId];
+    }
+    // Limpa o heartbeat
+    if (session?.heartbeatInterval) {
+      clearInterval(session.heartbeatInterval);
+    }
 
-  // Limpar timers
-  if (reconnectionTimers[sessionId]) {
-    clearTimeout(reconnectionTimers[sessionId]);
-    delete reconnectionTimers[sessionId];
-  }
-
-  if (qrRegenerationTimers[sessionId]) {
-    clearTimeout(qrRegenerationTimers[sessionId]);
-    delete qrRegenerationTimers[sessionId];
-  }
-
-  if (forceRemoveAuth) {
-    const folder = path.join(sessionPathResolved, `session-${sessionId}`);
-    if (fs.existsSync(folder)) {
+    const client = session?.client;
+    if (client) {
+      client.removeAllListeners();
       try {
-        fs.rmSync(folder, { recursive: true, force: true });
-        console.log(`[Sessão ${sessionId}] Pasta removida: ${folder}`);
+        await client.destroy();
+        console.log(`[Sessão ${sessionId}] 🧹 Cliente WA destruído com sucesso.`);
       } catch (e) {
-        console.error(`[Sessão ${sessionId}] Erro ao remover pasta:`, e.message);
+        console.error(`[Sessão ${sessionId}] ⚠️ Erro ao destruir cliente (ignorado): ${e.message}`);
       }
     }
-  }
+
+    // Remove todos os vestígios da sessão da memória
+    delete sessions[sessionId];
+    delete sessionModels[sessionId];
+    delete userChats[sessionId];
+    delete activeInitializations[sessionId];
+
+    if (forceRemoveAuth) {
+      try {
+        const folder = path.join(sessionPathResolved, `session-${sessionId}`);
+        if (fs.existsSync(folder)) {
+          fs.rmSync(folder, { recursive: true, force: true });
+          console.log(`[Sessão ${sessionId}] 🧹 Pasta de autenticação removida: ${folder}`);
+        }
+      } catch (fsErr) {
+        console.error(`[Sessão ${sessionId}] ⚠️ Erro ao remover pasta de autenticação: ${fsErr.message}`);
+      }
+    }
+    console.log(`[Sessão ${sessionId}] 🧹 Limpeza concluída.`);
+  })();
+
+  sessionCleanupLocks[sessionId] = cleanupPromise;
+  try { await cleanupPromise; } finally { delete sessionCleanupLocks[sessionId]; }
 };
 
 // --- VERIFICAÇÃO DE ESTADO DO CLIENTE ---
@@ -222,30 +226,34 @@ const startHeartbeat = (sessionId) => {
 // --- LISTENERS DE CICLO ---
 const attachLifecycleListeners = (client, sessionId) => {
   const sessionRef = ref(database, `tenants/${sessionId}/session`);
-  let qrCount = 0;
   let readyDetected = false;
 
   client.on('qr', async (qr) => {
-    const session = sessions[sessionId];
-    if (!session) return;
-    
-    // Não gerar novo QR se já está autenticado
-    if (readyDetected) {
-      console.log(`[Sessão ${sessionId}] ⚠️ Ignorando novo QR - Já autenticado`);
-      return;
+    try {
+      const session = sessions[sessionId];
+      if (!session) return;
+
+      // Se um QR é gerado e a sessão já estava 'ready', significa que outra instância se conectou.
+      if (readyDetected) {
+        console.warn(`[Sessão ${sessionId}] ⚠️ QR regenerado após 'ready'. Múltiplas conexões detectadas. Encerrando.`);
+        await set(sessionRef, { status: 'logged_out', reason: 'multiple_connections' });
+        await cleanupSession(sessionId, true); // Limpeza forçada
+        return;
+      }
+
+      if (!session.qrAttempts) session.qrAttempts = 0;
+      session.qrAttempts++;
+      const qrUrl = await qrcode.toDataURL(qr);
+
+      console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts}`);
+      await set(sessionRef, {
+        status: 'QR_CODE',
+        qr: qrUrl,
+        attempt: session.qrAttempts
+      });
+    } catch (error) {
+      console.error(`[Sessão ${sessionId}] Erro no handler de QR:`, error);
     }
-    
-    qrCount++;
-    session.qrAttempts++;
-    const qrUrl = await qrcode.toDataURL(qr);
-
-    console.log(`[Sessão ${sessionId}] QR gerado #${session.qrAttempts}`);
-
-    await set(sessionRef, {
-      status: 'QR_CODE',
-      qr: qrUrl,
-      attempt: session.qrAttempts
-    });
   });
 
   client.once('authenticated', () => {
@@ -253,21 +261,22 @@ const attachLifecycleListeners = (client, sessionId) => {
   });
 
   client.once('ready', async () => {
-    console.log(`[Sessão ${sessionId}] ✅ Cliente pronto`);
-    readyDetected = true;
-    await set(sessionRef, { status: 'ready' });
-    sessions[sessionId].status = 'ready';
-    sessions[sessionId].qrAttempts = 0;
-    sessions[sessionId].reconnectAttempts = 0;
-    sessions[sessionId].lastActivity = Date.now();
-
-    if (!sessions[sessionId].heartbeatInterval) {
-      sessions[sessionId].heartbeatInterval = startHeartbeat(sessionId);
-    }
-
-    if (qrRegenerationTimers[sessionId]) {
-      clearTimeout(qrRegenerationTimers[sessionId]);
-      delete qrRegenerationTimers[sessionId];
+    try {
+      console.log(`[Sessão ${sessionId}] ✅ Cliente pronto`);
+      readyDetected = true;
+      await set(sessionRef, { status: 'ready' });
+      const session = sessions[sessionId];
+      if (session) {
+        session.status = 'ready';
+        session.qrAttempts = 0;
+        session.reconnectAttempts = 0;
+        session.lastActivity = Date.now();
+        if (!session.heartbeatInterval) {
+          session.heartbeatInterval = startHeartbeat(sessionId);
+        }
+      }
+    } catch (error) {
+      console.error(`[Sessão ${sessionId}] Erro no handler de 'ready':`, error);
     }
   });
 
@@ -275,24 +284,11 @@ const attachLifecycleListeners = (client, sessionId) => {
     if (message.fromMe) return;
 
     const chatId = message.from;
-    const messageId = message.id.id || `${Date.now()}-${Math.random()}`;
-
-    if (messageProcessingLocks[messageId]) {
-      return;
-    }
-
-    messageProcessingLocks[messageId] = true;
+    console.log(`[Sessão ${sessionId}] 📩 Mensagem de ${chatId}: "${message.body}"`);
 
     try {
-      console.log(`[Sessão ${sessionId}] 📩 Mensagem de ${chatId}: "${message.body}"`);
-
       if (!await isClientValid(sessionId)) {
-        console.warn(`[Sessão ${sessionId}] ⚠️  Cliente inválido ao receber mensagem`);
-        return;
-      }
-
-      if (!message.body || message.body.trim() === '') {
-        console.log(`[Sessão ${sessionId}] ⏭️  Mensagem vazia, ignorando`);
+        console.warn(`[Sessão ${sessionId}] Cliente inválido ao receber mensagem`);
         return;
       }
 
@@ -301,7 +297,7 @@ const attachLifecycleListeners = (client, sessionId) => {
 
       if (!sessionModels[sessionId]) {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash";
+        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-1.5-flash";
         const systemInstruction = createSystemInstruction(config);
 
         sessionModels[sessionId] = genAI.getGenerativeModel({
@@ -316,67 +312,276 @@ const attachLifecycleListeners = (client, sessionId) => {
       }
 
       const chat = userChats[sessionId][chatId];
-
-      const result = await Promise.race([
-        chat.sendMessage(message.body),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout ao processar mensagem')), MESSAGE_TIMEOUT)
-        )
-      ]);
-
+      const result = await chat.sendMessage(message.body);
       const text = result.response.text();
 
-      if (!await isClientValid(sessionId)) {
-        console.warn(`[Sessão ${sessionId}] ⚠️  Cliente desconectou antes de enviar resposta`);
-        return;
-      }
-
       await message.reply(text);
-      sessions[sessionId].lastActivity = Date.now();
+      if (sessions[sessionId]) {
+        sessions[sessionId].lastActivity = Date.now();
+      }
 
     } catch (err) {
-      console.error(`[Sessão ${sessionId}] Erro ao processar mensagem:`, err.message);
-
-      // Envia uma mensagem de erro genérica para o usuário final,
-      // independentemente do tipo de erro (API, Puppeteer, etc),
-      // desde que o cliente ainda esteja conectado.
-      const isGoogleAIError = String(err).includes('GoogleGenerativeAI');
-      if (await isClientValid(sessionId) && isGoogleAIError) {
-        try {
-          await message.reply('🤖 Desculpe, estou com um problema para me conectar à minha inteligência. Tente novamente em alguns instantes.');
-        } catch (replyErr) {
-          console.error(`[Sessão ${sessionId}] Falha ao enviar a mensagem de erro para o usuário:`, replyErr.message);
-        }
+      console.error(`[Sessão ${sessionId}] Erro IA:`, err);
+      try {
+        await message.reply('Desculpe, tive um problema ao processar sua mensagem.');
+      } catch (replyErr) {
+        console.error(`[Sessão ${sessionId}] Erro ao enviar mensagem de erro:`, replyErr);
       }
-    } finally {
-      delete messageProcessingLocks[messageId];
     }
   });
 
   client.on('disconnected', async (reason) => {
-    console.log(`[Sessão ${sessionId}] ❌ Desconectado: ${reason}`);
-    readyDetected = false;
-    qrCount = 0;
+    try {
+      console.log(`[Sessão ${sessionId}] ❌ Desconectado: ${reason}`);
+      readyDetected = false;
 
-    if (String(reason).toUpperCase() === 'LOGOUT') {
-      console.log(`[Sessão ${sessionId}] 🔍 Analisando logout...`);
-      
-      // Diferenciar logout solicitado de automático
-      const lastActivity = sessions[sessionId]?.lastActivity || 0;
-      const timeSinceLastActivity = Date.now() - lastActivity;
-      
-      if (timeSinceLastActivity < 5000) {
-        // Logout recente (menos de 5 segundos de inatividade) = provavelmente solicitado
-        console.log(`[Sessão ${sessionId}] ✅ Logout solicitado pelo usuário`);
-        await cleanupSession(sessionId, true);
+      // LOGOUT é geralmente uma ação terminal (usuário desconectou ou múltiplas sessões).
+      // A sessão deve ser completamente encerrada.
+      if (String(reason).toUpperCase() === 'LOGOUT') {
+        console.log(`[Sessão ${sessionId}] Logout detectado, limpando sessão permanentemente.`);
         await set(sessionRef, { status: 'logged_out' });
+        await cleanupSession(sessionId, true);
         return;
+      }
+
+      // Para outras razões de desconexão, tenta reconectar.
+      const session = sessions[sessionId];
+      if (!session) {
+        return;
+      }
+
+      const attempts = session.reconnectAttempts || 0;
+      if (attempts < MAX_RECONNECTION_ATTEMPTS) {
+        session.reconnectAttempts = attempts + 1;
+        const delay = RECONNECTION_DELAY * (attempts + 1); // Aumenta o delay a cada tentativa
+        console.log(`[Sessão ${sessionId}] Tentando reconectar (${session.reconnectAttempts}/${MAX_RECONNECTION_ATTEMPTS}) em ${delay / 1000}s...`);
+
+        await cleanupSession(sessionId, false); // Limpa a sessão atual antes de reconectar
+
+        reconnectionTimers[sessionId] = setTimeout(() => {
+          initializeWhatsAppClient(sessionId)
+            .catch(e => console.error(`[Sessão ${sessionId}] Falha na reconexão agendada:`, e));
+        }, delay);
       } else {
-        // Logout antigo = provavelmente automático
-        console.log(`[Sessão ${sessionId}] ⚠️ Logout automático detectado (inatividade: ${timeSinceLastActivity}ms)`);
-        
-        // Reconectar automaticamente
-        const attempts = sessions[sessionId]?.reconnectAttempts || 0;
+        console.error(`[Sessão ${sessionId}] Máximo de tentativas de reconexão atingido. Limpando permanentemente.`);
+        await set(sessionRef, { status: 'disconnected' });
+        await cleanupSession(sessionId, true);
+      }
+    } catch (error) {
+      console.error(`[Sessão ${sessionId}] Erro grave no handler de desconexão:`, error);
+      await cleanupSession(sessionId, true); // Tenta uma limpeza final em caso de erro
+    }
+  });
+
+  client.on('error', (err) => {
+    console.error(`[Sessão ${sessionId}] Erro do cliente:`, err);
+  });
+};
+
+// --- INICIALIZAÇÃO DO CLIENTE ---
+const initializeWhatsAppClient = async (sessionId) => {
+  if (activeInitializations[sessionId]) {
+    return activeInitializations[sessionId];
+  }
+
+  activeInitializations[sessionId] = new Promise(async (resolve, reject) => {
+    try {
+      // Garante que não há sessões antigas ou timers pendentes antes de começar
+      await cleanupSession(sessionId, false);
+      await wait(1000); // Pequeno cooldown
+
+      let client = new Client({
+        authStrategy: new LocalAuth({
+          clientId: sessionId,
+          dataPath: sessionPathResolved
+        }),
+        puppeteer: {
+          headless: false,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+          ],
+        }
+      });
+
+      attachLifecycleListeners(client, sessionId);
+
+      sessions[sessionId] = {
+        client,
+        status: 'INITIALIZING',
+        qrAttempts: 0,
+        reconnectAttempts: (sessions[sessionId]?.reconnectAttempts || 0),
+        lastActivity: Date.now(),
+        heartbeatInterval: null
+      };
+
+      await client.initialize();
+      resolve(sessions[sessionId]);
+
+    } catch (e) {
+      console.error(`[Sessão ${sessionId}] Erro na inicialização:`, e);
+      await cleanupSession(sessionId, false); // Limpa em caso de falha
+      reject(e);
+    } finally {
+      delete activeInitializations[sessionId];
+    }
+  });
+
+  return activeInitializations[sessionId];
+};
+
+// --- HEALTH CHECK ---
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    time: new Date().toISOString(),
+    sessions: Object.keys(sessions)
+  });
+});
+
+// --- STATUS ROUTE ---
+app.get('/api/whatsapp/status/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  
+  // Verificar estado real do cliente
+  const isValid = await isClientValid(sessionId);
+  
+  if (isValid) {
+    res.json({ status: 'ready' });
+  } else {
+    try {
+      const snap = await get(ref(database, `tenants/${sessionId}/session/status`));
+      res.json({ status: snap.exists() ? snap.val() : 'disconnected' });
+    } catch (e) {
+      res.json({ status: 'disconnected' });
+    }
+  }
+});
+
+// --- QR ROUTE ---
+app.get('/api/whatsapp/qr/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  try {
+    const qrRef = ref(database, `tenants/${sessionId}/session/qr`);
+    const snapshot = await get(qrRef);
+    if (snapshot.exists()) {
+      res.json({ qr: snapshot.val() });
+    } else {
+      res.json({ qr: null, message: 'QR ainda não gerado.' });
+    }
+  } catch (e) {
+    console.error(`[QR ${sessionId}] erro:`, e);
+    res.status(500).json({ error: 'Erro ao buscar QR' });
+  }
+});
+
+// --- START SESSION ---
+app.post('/api/whatsapp/start/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+
+  const now = Date.now();
+  const WINDOW = 10000;
+
+  if (startRequestTimestamps[sessionId]) {
+    const delta = now - startRequestTimestamps[sessionId];
+    if (delta < WINDOW) {
+      return res.status(429).json({
+        success: false,
+        message: `Espere ${Math.ceil((WINDOW - delta) / 1000)} segundos para tentar novamente`
+      });
+    }
+  }
+
+  startRequestTimestamps[sessionId] = now;
+
+  const sessionRef = ref(database, `tenants/${sessionId}/session`);
+  const snap = await get(sessionRef);
+  const fbStatus = snap.exists() ? snap.val().status : 'disconnected';
+
+  if (fbStatus === 'ready' && sessions[sessionId]) {
+    const isValid = await isClientValid(sessionId);
+    if (isValid) {
+      return res.json({ success: true, message: 'Sessão já conectada' });
+    }
+  }
+
+  console.log(`[Sessão ${sessionId}] Iniciando inicialização...`);
+
+  initializeWhatsAppClient(sessionId)
+    .then(() => console.log(`[Sessão ${sessionId}] Inicialização concluída`))
+    .catch(e => console.error(`[Sessão ${sessionId}] Falha init:`, e));
+
+  res.json({ success: true, message: 'Inicialização iniciada' });
+});
+
+// --- STOP SESSION ---
+app.post('/api/whatsapp/stop/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+
+  const session = sessions[sessionId];
+  if (session && session.client) {
+    try {
+      await session.client.logout();
+      await cleanupSession(sessionId, true);
+      res.json({ success: true, message: 'Sessão encerrada' });
+    } catch (e) {
+      console.error(`[Sessão ${sessionId}] Erro ao desconectar:`, e);
+      res.status(500).json({ error: 'Erro ao desconectar' });
+    }
+  } else {
+    // Se a sessão não existe no nosso servidor, ainda tentamos limpar os arquivos
+    await cleanupSession(sessionId, true);
+    res.status(404).json({ success: true, message: 'Sessão não encontrada no servidor, mas limpeza forçada.' });
+  }
+});
+
+// --- UPDATE CONFIG ---
+app.post('/api/config/update/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  const data = req.body;
+
+  if (!data || Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'Nenhum dado enviado' });
+  }
+
+  try {
+    const cfgRef = ref(database, `tenants/${sessionId}/whatsappConfig`);
+    await set(cfgRef, data);
+
+    delete sessionModels[sessionId];
+    delete userChats[sessionId];
+
+    res.json({ success: true, message: 'Configurações atualizadas' });
+  } catch (e) {
+    console.error(`[Config ${sessionId}] erro:`, e);
+    res.status(500).json({ error: 'Falha ao salvar config' });
+  }
+});
+
+// --- GLOBAL ERROR HANDLERS ---
+process.on('unhandledRejection', (reason, p) => {
+  console.error('Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+// --- CLEANUP ON EXIT ---
+process.on('SIGINT', async () => {
+  console.log('\n[Sistema] Encerrando servidor...');
+  for (const sessionId of Object.keys(sessions)) {
+    await cleanupSession(sessionId, false);
+  }
+  process.exit(0);
+});
+
+// --- START SERVER ---
+app.listen(port, () => {
+  console.log(`🚀 Servidor rodando em http://localhost:${port}`);
+  console.log('📱 Aguardando sessões do WhatsApp...');
+});
         if (attempts < MAX_RECONNECTION_ATTEMPTS) {
           sessions[sessionId].reconnectAttempts = attempts + 1;
           const delay = RECONNECTION_DELAY * Math.pow(2, attempts);
