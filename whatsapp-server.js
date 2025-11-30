@@ -130,21 +130,29 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
 // --- LIMPEZA DE SESSÃO ---
 const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
-  // Se uma limpeza já está em progresso, aguarda a conclusão e sai.
+  // Se uma limpeza já está em progresso para esta sessão, aguarda a conclusão.
   if (sessionCleanupLocks[sessionId]) {
     console.log(`[Sessão ${sessionId}] 🧹 Aguardando limpeza anterior...`);
     await sessionCleanupLocks[sessionId].catch(err => {
       console.error(`[Sessão ${sessionId}] Erro na limpeza anterior (ignorado): ${err.message}`);
     });
-    return;
+    // Após aguardar, verifica se a sessão ainda existe antes de prosseguir.
+    // Se não existir mais, o trabalho já foi feito.
+    if (!sessions[sessionId] && !activeInitializations[sessionId]) {
+      return;
+    }
   }
 
   const cleanupPromise = (async () => {
     console.log(`[Sessão ${sessionId}] 🧹 Iniciando limpeza da sessão... RemoveAuth=${forceRemoveAuth}`);
 
     const session = sessions[sessionId];
-    if (!session) {
-      console.log(`[Sessão ${sessionId}] 🧹 Sessão já não existia.`);
+    // Se não há sessão, pode haver uma inicialização ativa que precisa ser limpa.
+    if (!session && !activeInitializations[sessionId]) {
+      console.log(`[Sessão ${sessionId}] 🧹 Sessão e inicialização já não existiam.`);
+      // Limpa a pasta de autenticação se forçado, mesmo sem sessão em memória
+    } else {
+      // Continua com a limpeza normal
     }
 
     // Limpa timers de reconexão pendentes
@@ -155,6 +163,7 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
     // Limpa o heartbeat
     if (session?.heartbeatInterval) {
       clearInterval(session.heartbeatInterval);
+      delete session.heartbeatInterval;
     }
 
     const client = session?.client;
@@ -189,7 +198,12 @@ const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
   })();
 
   sessionCleanupLocks[sessionId] = cleanupPromise;
-  try { await cleanupPromise; } finally { delete sessionCleanupLocks[sessionId]; }
+  try {
+    await cleanupPromise;
+  } finally {
+    // Garante que o lock seja liberado
+    delete sessionCleanupLocks[sessionId];
+  }
 };
 
 // --- VERIFICAÇÃO DE ESTADO DO CLIENTE ---
@@ -352,13 +366,12 @@ const attachLifecycleListeners = (client, sessionId) => {
       const attempts = session.reconnectAttempts || 0;
       if (attempts < MAX_RECONNECTION_ATTEMPTS) {
         session.reconnectAttempts = attempts + 1;
-        const delay = RECONNECTION_DELAY * (attempts + 1); // Aumenta o delay a cada tentativa
+        const delay = RECONNECTION_DELAY * Math.pow(2, attempts); // Backoff exponencial
         console.log(`[Sessão ${sessionId}] Tentando reconectar (${session.reconnectAttempts}/${MAX_RECONNECTION_ATTEMPTS}) em ${delay / 1000}s...`);
 
-        await cleanupSession(sessionId, false); // Limpa a sessão atual antes de reconectar
-
         reconnectionTimers[sessionId] = setTimeout(() => {
-          initializeWhatsAppClient(sessionId)
+          // A limpeza agora é chamada dentro de initializeWhatsAppClient
+          initializeWhatsAppClient(sessionId, true) // Passa 'true' para forçar a reinicialização
             .catch(e => console.error(`[Sessão ${sessionId}] Falha na reconexão agendada:`, e));
         }, delay);
       } else {
@@ -378,14 +391,20 @@ const attachLifecycleListeners = (client, sessionId) => {
 };
 
 // --- INICIALIZAÇÃO DO CLIENTE ---
-const initializeWhatsAppClient = async (sessionId) => {
+const initializeWhatsAppClient = async (sessionId, isReconnect = false) => {
   if (activeInitializations[sessionId]) {
+    console.log(`[Sessão ${sessionId}] Aguardando inicialização já em progresso...`);
     return activeInitializations[sessionId];
   }
 
   activeInitializations[sessionId] = new Promise(async (resolve, reject) => {
     try {
-      // Tenta limpar a sessão anterior, mas não deixa o processo falhar se a limpeza falhar.
+      // Se for uma reconexão ou se já houver uma sessão (mesmo que inválida), limpa primeiro.
+      if (isReconnect || sessions[sessionId]) {
+        console.log(`[Sessão ${sessionId}] Limpando sessão anterior antes de inicializar...`);
+        await cleanupSession(sessionId, false);
+      }
+
       try {
         await cleanupSession(sessionId, false);
       } catch (cleanupErr) {
@@ -409,7 +428,6 @@ const initializeWhatsAppClient = async (sessionId) => {
             '--no-zygote',
             '--disable-gpu'
           ],
-          executablePath: '/usr/bin/chromium' // Adicionado para garantir que o Chromium instalado pelo Nixpacks seja usado
         }
       });
 
@@ -429,7 +447,7 @@ const initializeWhatsAppClient = async (sessionId) => {
 
     } catch (e) {
       console.error(`[Sessão ${sessionId}] Erro na inicialização:`, e);
-      await cleanupSession(sessionId, false); // Limpa em caso de falha
+      await cleanupSession(sessionId, true); // Limpa em caso de falha, incluindo autenticação se necessário
       reject(e);
     } finally {
       delete activeInitializations[sessionId];
