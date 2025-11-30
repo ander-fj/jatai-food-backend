@@ -556,9 +556,11 @@ app.post('/api/whatsapp/stop/:sessionId', async (req, res) => {
       res.status(500).json({ error: 'Erro ao desconectar' });
     }
   } else {
-    // Se a sessão não existe no nosso servidor, ainda tentamos limpar os arquivos
+    // Se a sessão não existe na memória do servidor, ainda tentamos limpar os arquivos e o estado no DB.
+    console.log(`[Sessão ${sessionId}] Sessão não encontrada na memória. Forçando limpeza de arquivos e estado.`);
     await cleanupSession(sessionId, true);
-    res.status(404).json({ success: true, message: 'Sessão não encontrada no servidor, mas limpeza forçada.' });
+    await set(ref(database, `tenants/${sessionId}/session`), { status: 'logged_out' });
+    res.json({ success: true, message: 'Sessão não encontrada no servidor, mas limpeza forçada executada.' });
   }
 });
 
