@@ -249,9 +249,6 @@ const attachLifecycleListeners = (sessionId, client, initializationPromise) => {
       }
       
       // CORREÇÃO: Resolver a promise de inicialização quando cliente fica ready
-      if (initializationPromise && initializationPromise.resolve && !readyDetected) {
-        initializationPromise.resolve(sessions[sessionId]);
-      }
     } catch (e) {
       console.error(`[${sessionId}] Erro handler 'ready':`, e.message || e);
     }
@@ -309,11 +306,46 @@ const attachLifecycleListeners = (sessionId, client, initializationPromise) => {
       const chatId = message.from;
       console.log(`[${sessionId}] 📩 Mensagem de ${chatId}: "${message.body}"`);
 
-      // Aqui você pode processar a mensagem com IA, etc.
-      // Exemplo: enviar resposta automática
-      // await client.sendMessage(chatId, 'Obrigado pela mensagem!');
+      // --- LÓGICA DA IA ---
+      const configSnap = await get(ref(database, `sessions/${sessionId}/config`));
+      const config = configSnap.exists() ? configSnap.val() : {};
+
+      // Inicializa o modelo da IA para a sessão, se ainda não existir
+      if (!sessionModels[sessionId]) {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash"; // Usando um modelo padrão
+        const systemInstruction = createSystemInstruction(config);
+
+        sessionModels[sessionId] = genAI.getGenerativeModel({
+          model: modelName,
+          systemInstruction,
+        });
+      }
+
+      // Inicia um novo chat para o usuário, se for a primeira mensagem
+      if (!userChats[sessionId]) userChats[sessionId] = {};
+      if (!userChats[sessionId][chatId]) {
+        userChats[sessionId][chatId] = sessionModels[sessionId].startChat({ history: [] });
+      }
+
+      // Envia a mensagem para a IA e obtém a resposta
+      const chat = userChats[sessionId][chatId];
+      const result = await chat.sendMessage(message.body);
+      const text = result.response.text();
+
+      // Envia a resposta da IA de volta para o usuário no WhatsApp
+      await message.reply(text);
+
+      if (sessions[sessionId]) {
+        sessions[sessionId].lastActivity = Date.now();
+      }
     } catch (e) {
-      console.error(`[${sessionId}] Erro handler 'message':`, e.message || e);
+      console.error(`[${sessionId}] Erro no handler 'message' (IA):`, e.message || e);
+      try {
+        await message.reply('Desculpe, não consegui processar sua mensagem no momento. 🤖');
+      } catch (replyErr) {
+        console.error(`[${sessionId}] Erro ao enviar mensagem de erro:`, replyErr);
+      }
     }
   });
 };
@@ -349,7 +381,7 @@ const initializeWhatsAppClient = async (sessionId, isReconnect = false) => {
       const client = new Client({
         authStrategy: new LocalAuth({ clientId: sessionId, dataPath: authDir }),
         puppeteer: {
-          headless: true,
+          headless: true, // Mantenha como true em produção
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -370,7 +402,7 @@ const initializeWhatsAppClient = async (sessionId, isReconnect = false) => {
       attachLifecycleListeners(sessionId, client, initializationPromise);
 
       await client.initialize(); // Inicia o Puppeteer
-      console.log(`[${sessionId}] Inicial concluído.`);
+      // O log de "concluído" agora é implícito pela geração do QR ou pelo status 'ready'
     } catch (err) {
       console.error(`[${sessionId}] Falha ao inicializar client:`, err.message || err);
       await cleanupSession(sessionId, false);
