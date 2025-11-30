@@ -11,7 +11,6 @@ interface WhatsAppConfig {
   menuUrl: string;
   hours: string;
   address: string;
-  welcomeMessage: string;
 }
 
 type ConnectionStatus = 
@@ -19,7 +18,7 @@ type ConnectionStatus =
   | 'initializing'
   | 'qr'
   | 'ready'
-  | 'auth_failure'
+  | 'QR_CODE' // Adicionado para corresponder ao backend
   | 'ERROR'
   | 'logged_out';
 
@@ -39,7 +38,6 @@ const WhatsAppAttendanceSection: React.FC = () => {
     menuUrl: '',
     hours: '',
     address: '',
-    welcomeMessage: 'Olá! Eu sou o Jataí, seu assistente virtual. Como posso te ajudar hoje? 😊',
   });
   
   const [isLoading, setIsLoading] = useState(true);
@@ -103,7 +101,7 @@ const WhatsAppAttendanceSection: React.FC = () => {
         }
 
         // Buscar QR code apenas se o status for qr
-        if (newStatus === 'qr') {
+        if (newStatus === 'qr' || newStatus === 'QR_CODE') {
           const qrResponse = await fetch(`${API_URL}/api/whatsapp/qr/${username}`);
           if (qrResponse.ok) {
             const qrData = await qrResponse.json();
@@ -112,6 +110,7 @@ const WhatsAppAttendanceSection: React.FC = () => {
             } else {
               console.log('QR code ainda não disponível');
             }
+            setConnectionStatus('QR_CODE'); // Normaliza o status
           }
           setIsConnecting(false);
         } else {
@@ -253,14 +252,12 @@ const WhatsAppAttendanceSection: React.FC = () => {
     switch (connectionStatus) {
       case 'ready':
         return { icon: <Wifi className="h-6 w-6 text-green-500 mr-2" />, text: '✅ Conectado', color: 'text-green-600', subtext: 'WhatsApp conectado e funcionando' };
-      case 'qr':
+      case 'QR_CODE':
         return { icon: <QrCode className="h-6 w-6 text-yellow-500 mr-2" />, text: '⏳ Aguardando leitura do QR Code', color: 'text-yellow-600' };
       case 'initializing':
         return { icon: <Loader className="animate-spin h-6 w-6 text-blue-500 mr-2" />, text: '🔄 Iniciando...', color: 'text-blue-600' };
-      case 'auth_failure':
-        return { icon: <AlertTriangle className="h-6 w-6 text-red-500 mr-2" />, text: '❌ Falha na autenticação', color: 'text-red-600' };
       case 'ERROR':
-        return { icon: <WifiOff className="h-6 w-6 text-red-500 mr-2" />, text: '⚠️ Erro na conexão', color: 'text-red-600' };
+        return { icon: <WifiOff className="h-6 w-6 text-red-500 mr-2" />, text: '⚠️ Erro na conexão', color: 'text-red-600', subtext: 'Ocorreu um erro. Tente reconectar.' };
       case 'logged_out':
         return { icon: <LogOut className="h-6 w-6 text-orange-500 mr-2" />, text: '🔓 Desconectado (Logout)', color: 'text-orange-600', subtext: 'Sessão encerrada. Clique em Conectar para iniciar novamente.' };
       default:
@@ -310,7 +307,7 @@ const WhatsAppAttendanceSection: React.FC = () => {
           )}
         </div>
 
-        {connectionStatus === 'qr' && qrCode && (
+        {connectionStatus === 'QR_CODE' && qrCode && (
           <div className="mt-4 p-4 bg-white rounded-md shadow-inner flex flex-col items-center animate-fade-in">
             <h4 className="text-md font-semibold text-gray-700 mb-2">📱 Escaneie para conectar</h4>
             <img src={qrCode} alt="QR Code do WhatsApp" className="w-48 h-48 rounded-md border-2 border-gray-200" />
@@ -320,12 +317,10 @@ const WhatsAppAttendanceSection: React.FC = () => {
           </div>
         )}
 
-        {(connectionStatus === 'auth_failure' || connectionStatus === 'ERROR') && (
+        {connectionStatus === 'ERROR' && (
           <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 rounded">
             <p className="text-sm text-red-700">
-              {connectionStatus === 'auth_failure' 
-                ? '❌ Falha na autenticação. Tente conectar novamente.'
-                : '⚠️ Ocorreu um erro na conexão. Verifique o console do servidor ou tente reconectar.'}
+              ⚠️ Ocorreu um erro na conexão. Verifique o console do servidor ou tente reconectar.
             </p>
           </div>
         )}
@@ -400,12 +395,6 @@ const WhatsAppAttendanceSection: React.FC = () => {
             <div>
               <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
               <input type="text" name="address" id="address" value={config.address} onChange={handleInputChange} placeholder="Rua, Número, Bairro, Cidade-UF" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
-            </div>
-
-            <div>
-              <label htmlFor="welcomeMessage" className="block text-sm font-medium text-gray-700 mb-1">Mensagem de Boas-vindas</label>
-              <textarea name="welcomeMessage" id="welcomeMessage" rows={4} value={config.welcomeMessage} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
-              <p className="mt-2 text-xs text-gray-500">Esta é a primeira mensagem que o assistente enviará. Use emojis para deixar mais amigável! 🚀</p>
             </div>
 
             <div className="flex justify-end">
