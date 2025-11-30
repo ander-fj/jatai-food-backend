@@ -392,7 +392,7 @@ const initializeWhatsAppClient = async (sessionId) => {
       } catch (cleanupErr) {
         console.warn(`[Sessão ${sessionId}] Aviso: A limpeza da sessão anterior falhou, mas a inicialização continuará. Erro: ${cleanupErr.message}`);
       }
-      await wait(1000); // Pequeno cooldown
+      await wait(1000); // Pequeno cooldown 
 
       let client = new Client({
         authStrategy: new LocalAuth({
