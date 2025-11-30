@@ -386,8 +386,12 @@ const initializeWhatsAppClient = async (sessionId) => {
 
   activeInitializations[sessionId] = new Promise(async (resolve, reject) => {
     try {
-      // Garante que não há sessões antigas ou timers pendentes antes de começar
-      await cleanupSession(sessionId, false);
+      // Tenta limpar a sessão anterior, mas não deixa o processo falhar se a limpeza falhar.
+      try {
+        await cleanupSession(sessionId, false);
+      } catch (cleanupErr) {
+        console.warn(`[Sessão ${sessionId}] Aviso: A limpeza da sessão anterior falhou, mas a inicialização continuará. Erro: ${cleanupErr.message}`);
+      }
       await wait(1000); // Pequeno cooldown
 
       let client = new Client({
