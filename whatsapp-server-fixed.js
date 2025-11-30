@@ -81,7 +81,7 @@ const port = process.env.PORT || 3001;
 const allowedOrigins = [
   'https://www.jataifood.com.br',
   'https://jataifood.com.br',
-  'https://jatai-food-backend-production.up.railway.app',
+   'https://jatai-food-backend-production.up.railway.app',
   'http://localhost:5173',
 ];
 
@@ -104,15 +104,14 @@ const sessions = {};
 const sessionModels = {};
 const userChats = {};
 const activeInitializations = {};
-const reconnectionAttempts = {};
 const startRequestTimestamps = {};
-const reconnectionTimers = {};
+const reconnectionTimers = {}; // Kept for cleanup of old timers, but not for creating new ones
+const sessionCleanupLocks = {}; // To prevent race conditions in cleanup
 
 // --- CONSTANTES ---
-const MAX_RECONNECTION_ATTEMPTS = 5;
-const RECONNECTION_DELAY = 5000; // 5 segundos
 const HEARTBEAT_INTERVAL = 30000; // 30 segundos
-const SESSION_TIMEOUT = 300000; // 5 minutos de inatividade
+const MAX_RECONNECTION_ATTEMPTS = 3;
+const RECONNECTION_DELAY = 10000; // 10 segundos
 
 // --- SISTEMA IA ---
 const createSystemInstruction = (config) => `
@@ -130,37 +129,77 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
 // --- LIMPEZA DE SESSÃO ---
 const cleanupSession = async (sessionId, forceRemoveAuth = false) => {
-  console.log(`[Sessão ${sessionId}] 🧹 Limpando sessão... RemoveAuth=${forceRemoveAuth}`);
+  // If a cleanup is already in progress for this session, wait for it to complete and then exit.
+  if (sessionCleanupLocks[sessionId]) {
+    console.log(`[Sessão ${sessionId}] 🧹 Aguardando limpeza anterior...`);
+    await sessionCleanupLocks[sessionId].catch(err => {
+      console.error(`[Sessão ${sessionId}] Erro na limpeza anterior (ignorado): ${err.message}`);
+    });
+    return;
+  }
 
-  const client = sessions[sessionId]?.client || null;
+  const cleanupPromise = (async () => {
+    console.log(`[Sessão ${sessionId}] 🧹 Iniciando limpeza da sessão... RemoveAuth=${forceRemoveAuth}`);
 
-  try { await remove(ref(database, `tenants/${sessionId}/session`)); } catch {}
+    const session = sessions[sessionId];
+    if (!session) {
+      console.log(`[Sessão ${sessionId}] 🧹 Sessão já não existia.`);
+      return;
+    }
 
-  if (client) {
-    try {
+    // Clear any pending reconnection timers from old logic
+    if (reconnectionTimers[sessionId]) {
+      clearTimeout(reconnectionTimers[sessionId]);
+      delete reconnectionTimers[sessionId];
+    }
+    // Clear heartbeat
+    if (session.heartbeatInterval) {
+      clearInterval(session.heartbeatInterval);
+    }
+
+    const client = session.client;
+    if (client) {
       client.removeAllListeners();
-      await client.destroy();
-    } catch (e) {
-      console.error(`[Sessão ${sessionId}] Erro ao destruir cliente:`, e);
+      try {
+        await client.destroy();
+        console.log(`[Sessão ${sessionId}] 🧹 Cliente WA destruído com sucesso.`);
+      } catch (e) {
+        console.error(`[Sessão ${sessionId}] ⚠️ Erro ao destruir cliente (ignorado): ${e.message}`);
+      }
     }
+
+    // Remove all traces of the session from memory
     delete sessions[sessionId];
-  }
+    delete sessionModels[sessionId];
+    delete userChats[sessionId];
+    delete activeInitializations[sessionId];
 
-  delete sessionModels[sessionId];
-  delete userChats[sessionId];
-
-  // Limpar timers de reconexão
-  if (reconnectionTimers[sessionId]) {
-    clearTimeout(reconnectionTimers[sessionId]);
-    delete reconnectionTimers[sessionId];
-  }
-
-  if (forceRemoveAuth) {
-    const folder = path.join(sessionPathResolved, `session-${sessionId}`);
-    if (fs.existsSync(folder)) {
-      fs.rmSync(folder, { recursive: true, force: true });
-      console.log(`[Sessão ${sessionId}] Pasta removida: ${folder}`);
+    // Update status in Firebase
+    try {
+      await set(ref(database, `tenants/${sessionId}/session`), { status: 'disconnected' });
+    } catch (dbErr) {
+      console.error(`[Sessão ${sessionId}] ⚠️ Erro ao atualizar status no Firebase: ${dbErr.message}`);
     }
+
+    if (forceRemoveAuth) {
+      try {
+        const folder = path.join(sessionPathResolved, `session-${sessionId}`);
+        if (fs.existsSync(folder)) {
+          fs.rmSync(folder, { recursive: true, force: true });
+          console.log(`[Sessão ${sessionId}] 🧹 Pasta de autenticação removida: ${folder}`);
+        }
+      } catch (fsErr) {
+        console.error(`[Sessão ${sessionId}] ⚠️ Erro ao remover pasta de autenticação: ${fsErr.message}`);
+      }
+    }
+    console.log(`[Sessão ${sessionId}] 🧹 Limpeza concluída.`);
+  })();
+
+  sessionCleanupLocks[sessionId] = cleanupPromise;
+  try {
+    await cleanupPromise;
+  } finally {
+    delete sessionCleanupLocks[sessionId];
   }
 };
 
