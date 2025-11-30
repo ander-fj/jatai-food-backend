@@ -1,4 +1,3 @@
-// server.js - completo
 // --- IMPORTS ---
 const express = require('express');
 const cors = require('cors');
@@ -186,11 +185,17 @@ const cleanupSession = async (sessionId, removeAuthFiles = false) => {
 };
 
 // --- ATTACH LISTENERS (isolado por client) ---
-const attachLifecycleListeners = (sessionId, client) => {
-  const sessionRefPath = `sessions/${sessionId}/session`;
+const attachLifecycleListeners = (sessionId, client, initializationPromise) => {
+  const sessionRef = ref(database, `sessions/${sessionId}/session`);
 
   let qrAttempts = 0;
   let readyDetected = false;
+  
+  // CORREÇÃO: Validar que a promise foi passada corretamente
+  if (!initializationPromise || !initializationPromise.resolve) {
+    console.error(`[${sessionId}] Erro: initializationPromise não foi passada corretamente aos listeners`);
+    return;
+  }
 
   client.on('qr', async (qr) => {
     try {
@@ -198,7 +203,7 @@ const attachLifecycleListeners = (sessionId, client) => {
       const qrUrl = await qrcode.toDataURL(qr);
 
       // marca status e qr no DB; não removemos automaticamente
-      await writeSessionStatusToDB(sessionId, {
+      await set(sessionRef, {
         status: 'qr',
         qr: qrUrl,
         attempt: qrAttempts,
@@ -212,6 +217,10 @@ const attachLifecycleListeners = (sessionId, client) => {
       sessions[sessionId].qrAttempts = qrAttempts;
 
       console.log(`[${sessionId}] 📲 QR gerado (attempt ${qrAttempts})`);
+      // CORREÇÃO: Resolver a promise de inicialização com o QR gerado
+      if (initializationPromise && initializationPromise.resolve) {
+        initializationPromise.resolve(sessions[sessionId]);
+      }
     } catch (e) {
       console.error(`[${sessionId}] Erro handler 'qr':`, e.message || e);
     }
@@ -220,7 +229,7 @@ const attachLifecycleListeners = (sessionId, client) => {
   client.on('authenticated', async () => {
     console.log(`[${sessionId}] 🔐 Autenticado.`);
     // opcional: marcar no DB
-    await writeSessionStatusToDB(sessionId, { status: 'authenticated', updatedAt: Date.now() });
+    await set(sessionRef, { status: 'authenticated', updatedAt: Date.now() });
   });
 
   client.on('ready', async () => {
@@ -229,12 +238,19 @@ const attachLifecycleListeners = (sessionId, client) => {
       console.log(`[${sessionId}] ✅ Cliente pronto (ready).`);
 
       // marca no DB e remove qr (frontend deve passar para status ready)
-      await writeSessionStatusToDB(sessionId, { status: 'ready', updatedAt: Date.now() });
+      await set(sessionRef, { status: 'ready', updatedAt: Date.now() });
 
       if (sessions[sessionId]) {
         sessions[sessionId].status = 'ready';
         sessions[sessionId].qrAttempts = 0;
         sessions[sessionId].lastActivity = Date.now();
+        // Zera tentativas de reconexão no sucesso
+        sessions[sessionId].reconnectAttempts = 0;
+      }
+      
+      // CORREÇÃO: Resolver a promise de inicialização quando cliente fica ready
+      if (initializationPromise && initializationPromise.resolve && !readyDetected) {
+        initializationPromise.resolve(sessions[sessionId]);
       }
     } catch (e) {
       console.error(`[${sessionId}] Erro handler 'ready':`, e.message || e);
@@ -243,7 +259,7 @@ const attachLifecycleListeners = (sessionId, client) => {
 
   client.on('auth_failure', async (msg) => {
     console.warn(`[${sessionId}] auth_failure:`, msg);
-    await writeSessionStatusToDB(sessionId, { status: 'auth_failure', updatedAt: Date.now() });
+    await set(sessionRef, { status: 'auth_failure', updatedAt: Date.now() });
     // tenta cleanup e reconectar levemente
     await cleanupSession(sessionId, false);
     // reconectar
@@ -258,7 +274,7 @@ const attachLifecycleListeners = (sessionId, client) => {
     // Se a razão for 'LOGOUT' ou 'NAVIGATION' (conflito de sessão), limpamos permanentemente.
     if (String(reason).toUpperCase() === 'LOGOUT' || reason === 'NAVIGATION') {
       console.log(`[${sessionId}] Logout ou conflito detectado. Limpando sessão permanentemente.`);
-      await writeSessionStatusToDB(sessionId, { status: 'logged_out', reason: String(reason) });
+      await set(sessionRef, { status: 'logged_out', reason: String(reason) });
       await cleanupSession(sessionId, true); // O 'true' remove os arquivos de autenticação.
       return;
     }
@@ -271,7 +287,7 @@ const attachLifecycleListeners = (sessionId, client) => {
     if (attempts < MAX_RECONNECT_ATTEMPTS) {
       const delay = RECONNECT_BASE_DELAY * Math.pow(2, attempts);
       console.log(`[${sessionId}] Tentando reconectar em ${delay}ms (attempt ${attempts + 1})`);
-      await cleanupSession(sessionId, false); // Limpa a sessão da memória antes de tentar de novo.
+      await cleanupSession(sessionId, false);
       const timerId = setTimeout(() => {
         initializeWhatsAppClient(sessionId, true).catch(err => console.error(`[${sessionId}] Reconnect fail:`, err));
       }, delay);
@@ -283,7 +299,7 @@ const attachLifecycleListeners = (sessionId, client) => {
     } else {
       console.warn(`[${sessionId}] Máximo de tentativas de reconexão atingido.`);
       await cleanupSession(sessionId, true); // Limpa permanentemente após falhar várias vezes.
-      await writeSessionStatusToDB(sessionId, { status: 'disconnected_permanent', updatedAt: Date.now() });
+      await set(sessionRef, { status: 'disconnected_permanent', updatedAt: Date.now() });
     }
   });
 
@@ -293,36 +309,12 @@ const attachLifecycleListeners = (sessionId, client) => {
       const chatId = message.from;
       console.log(`[${sessionId}] 📩 Mensagem de ${chatId}: "${message.body}"`);
 
-      // exemplo simples: responder com IA (se configurado)
-      const cfgSnap = await get(ref(database, `sessions/${sessionId}/config`));
-      const cfg = cfgSnap.exists() ? cfgSnap.val() : {};
-
-      if (!sessionModels[sessionId]) {
-        sessionModels[sessionId] = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-      }
-
-      const model = sessionModels[sessionId].getGenerativeModel({
-        model: process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash',
-        systemInstruction: createSystemInstruction(cfg)
-      });
-
-      // começa chat e envia
-      userChats[sessionId] = userChats[sessionId] || {};
-      if (!userChats[sessionId][chatId]) userChats[sessionId][chatId] = model.startChat({ history: [] });
-
-      const chat = userChats[sessionId][chatId];
-      const result = await chat.sendMessage(message.body || '');
-      const text = result.response.text();
-
-      await message.reply(text);
-    } catch (err) {
-      console.error(`[${sessionId}] Erro processar mensagem:`, err.message || err);
-      try { await message.reply('Desculpe, tive um problema ao processar sua mensagem.'); } catch (_) {}
+      // Aqui você pode processar a mensagem com IA, etc.
+      // Exemplo: enviar resposta automática
+      // await client.sendMessage(chatId, 'Obrigado pela mensagem!');
+    } catch (e) {
+      console.error(`[${sessionId}] Erro handler 'message':`, e.message || e);
     }
-  });
-
-  client.on('error', (err) => {
-    console.error(`[${sessionId}] Erro cliente:`, err.message || err);
   });
 };
 
@@ -333,48 +325,52 @@ const initializeWhatsAppClient = async (sessionId, isReconnect = false) => {
     return activeInitializations[sessionId];
   }
 
-  const initializationPromise = new Promise(async (resolve, reject) => {
-    console.log(`[${sessionId}] 🚀 Iniciando sessão WhatsApp... (lock adquirido)`);
+  let resolve, reject;
+  const initializationPromise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  // Adiciona as funções de resolução/rejeição à promise para uso nos listeners
+  initializationPromise.resolve = resolve;
+  initializationPromise.reject = reject;
 
-    // limpa qualquer cliente antigo (não remove arquivos por padrão)
-    if (sessions[sessionId]) {
-      try { await cleanupSession(sessionId, false); } catch (_) {}
-    }
+  activeInitializations[sessionId] = initializationPromise;
+  console.log(`[${sessionId}] 🚀 Iniciando sessão WhatsApp... (lock adquirido)`);
 
-    const authDir = path.join(sessionPathResolved, sessionId);
-    ensureDir(authDir);
-
-    const client = new Client({
-      authStrategy: new LocalAuth({ clientId: sessionId, dataPath: authDir }),
-      puppeteer: {
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ]
-      }
-    });
-
-    // guarda client na memória
-    sessions[sessionId] = sessions[sessionId] || {};
-    sessions[sessionId].client = client;
-    sessions[sessionId].status = 'INITIALIZING';
-    sessions[sessionId].qrAttempts = 0;
-    if (!isReconnect) {
-      sessions[sessionId].reconnectAttempts = 0;
-    }
-
-    // attach listeners
-    attachLifecycleListeners(sessionId, client);
-
+  (async () => {
     try {
-      await client.initialize();
-      console.log(`[${sessionId}] Inicialização do client solicitada.`);
-      resolve(sessions[sessionId]);
+      if (sessions[sessionId]) {
+        await cleanupSession(sessionId, false);
+      }
+
+      const authDir = path.join(sessionPathResolved, sessionId);
+      ensureDir(authDir);
+
+      const client = new Client({
+        authStrategy: new LocalAuth({ clientId: sessionId, dataPath: authDir }),
+        puppeteer: {
+          headless: true,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu'
+          ]
+        }
+      });
+
+      sessions[sessionId] = sessions[sessionId] || {};
+      sessions[sessionId].client = client;
+      sessions[sessionId].status = 'INITIALIZING';
+      if (!isReconnect) sessions[sessionId].reconnectAttempts = 0;
+
+      // CORREÇÃO: Passar a promise de inicialização aos listeners
+      attachLifecycleListeners(sessionId, client, initializationPromise);
+
+      await client.initialize(); // Inicia o Puppeteer
+      console.log(`[${sessionId}] Inicial concluído.`);
     } catch (err) {
       console.error(`[${sessionId}] Falha ao inicializar client:`, err.message || err);
       await cleanupSession(sessionId, false);
@@ -383,10 +379,9 @@ const initializeWhatsAppClient = async (sessionId, isReconnect = false) => {
       delete activeInitializations[sessionId];
       console.log(`[${sessionId}] Lock de inicialização liberado.`);
     }
-  });
+  })();
 
-  activeInitializations[sessionId] = initializationPromise;
-  return initializationPromise;
+  return activeInitializations[sessionId]; // Retorna a promise que será resolvida pelos listeners
 };
 
 // ----------------- ROTAS -----------------
@@ -471,22 +466,6 @@ app.post('/api/whatsapp/stop/:sessionId', async (req, res) => {
     res.json({ success: true, message: 'Sessão parada e limpa (memória).' });
   } catch (e) {
     console.error(`[STOP ${sessionId}] Erro:`, e.message || e);
-    res.status(500).json({ success: false, error: e.message || e });
-  }
-});
-
-// UPDATE CONFIG (salva config no DB)
-app.post('/api/config/update/:sessionId', async (req, res) => {
-  const { sessionId } = req.params;
-  const data = req.body || {};
-  try {
-    await set(ref(database, `sessions/${sessionId}/config`), data);
-    // limpa cache local IA
-    delete sessionModels[sessionId];
-    delete userChats[sessionId];
-    res.json({ success: true });
-  } catch (e) {
-    console.error(`[CONFIG ${sessionId}] Erro:`, e.message || e);
     res.status(500).json({ success: false, error: e.message || e });
   }
 });
