@@ -328,58 +328,65 @@ const attachLifecycleListeners = (sessionId, client) => {
 
 // --- INITIALIZE CLIENT ---
 const initializeWhatsAppClient = async (sessionId, isReconnect = false) => {
-  console.log(`[${sessionId}] 🚀 Tentativa de inicialização. isReconnect=${isReconnect}. Chamadas ativas: ${Object.keys(activeInitializations).length}`);
   if (activeInitializations[sessionId]) {
     console.log(`[${sessionId}] Inicialização já em andamento. Abortando nova tentativa.`);
-    return;
-  }
-  activeInitializations[sessionId] = true;
-
-  console.log(`[${sessionId}] 🚀 Iniciando sessão WhatsApp... (lock adquirido)`);
-
-  // limpa qualquer cliente antigo (não remove arquivos por padrão)
-  if (sessions[sessionId]) {
-    try { await cleanupSession(sessionId, false); } catch (_) {}
+    return activeInitializations[sessionId];
   }
 
-  const authDir = path.join(sessionPathResolved, sessionId);
-  ensureDir(authDir);
+  const initializationPromise = new Promise(async (resolve, reject) => {
+    console.log(`[${sessionId}] 🚀 Iniciando sessão WhatsApp... (lock adquirido)`);
 
-  const client = new Client({
-    authStrategy: new LocalAuth({ clientId: sessionId, dataPath: authDir }),
-    puppeteer: {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu'
-      ]
+    // limpa qualquer cliente antigo (não remove arquivos por padrão)
+    if (sessions[sessionId]) {
+      try { await cleanupSession(sessionId, false); } catch (_) {}
+    }
+
+    const authDir = path.join(sessionPathResolved, sessionId);
+    ensureDir(authDir);
+
+    const client = new Client({
+      authStrategy: new LocalAuth({ clientId: sessionId, dataPath: authDir }),
+      puppeteer: {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu'
+        ]
+      }
+    });
+
+    // guarda client na memória
+    sessions[sessionId] = sessions[sessionId] || {};
+    sessions[sessionId].client = client;
+    sessions[sessionId].status = 'INITIALIZING';
+    sessions[sessionId].qrAttempts = 0;
+    if (!isReconnect) {
+      sessions[sessionId].reconnectAttempts = 0;
+    }
+
+    // attach listeners
+    attachLifecycleListeners(sessionId, client);
+
+    try {
+      await client.initialize();
+      console.log(`[${sessionId}] Inicialização do client solicitada.`);
+      resolve(sessions[sessionId]);
+    } catch (err) {
+      console.error(`[${sessionId}] Falha ao inicializar client:`, err.message || err);
+      await cleanupSession(sessionId, false);
+      reject(err);
+    } finally {
+      delete activeInitializations[sessionId];
+      console.log(`[${sessionId}] Lock de inicialização liberado.`);
     }
   });
 
-  // guarda client na memória
-  sessions[sessionId] = sessions[sessionId] || {};
-  sessions[sessionId].client = client;
-  sessions[sessionId].status = 'INITIALIZING';
-  sessions[sessionId].qrAttempts = 0;
-  sessions[sessionId].reconnectAttempts = 0;
-
-  // attach listeners
-  attachLifecycleListeners(sessionId, client);
-
-  try {
-    await client.initialize();
-    console.log(`[${sessionId}] Inicialização do client solicitada.`);
-  } catch (err) {
-    console.error(`[${sessionId}] Falha ao inicializar client:`, err.message || err);
-    // tenta cleanup parcial
-    await cleanupSession(sessionId, false);
-  } finally {
-    activeInitializations[sessionId] = false;
-  }
+  activeInitializations[sessionId] = initializationPromise;
+  return initializationPromise;
 };
 
 // ----------------- ROTAS -----------------
