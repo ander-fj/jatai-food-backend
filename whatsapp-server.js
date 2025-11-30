@@ -98,12 +98,13 @@ const RECONNECT_BASE_DELAY = 2000; // ms
 
 // --- SYSTEM INSTRUCTION IA (opcional) ---
 const createSystemInstruction = (cfg) => `
-Você é o assistente do restaurante ${cfg.restaurantName || 'Restaurante'}.
+Você é o assistente do restaurante ${cfg.nome || 'nosso restaurante'}.
+Sua primeira mensagem para o cliente deve ser: "${cfg.mensagemBoasVindas || 'Olá! Como posso ajudar?'}"
 Seja claro, rápido e educado.
-Cardápio: ${cfg.menuUrl || 'não informado'}
-Horário: ${cfg.hours || 'não informado'}
-Endereço: ${cfg.address || 'não informado'}
-Telefone: ${cfg.phoneNumber || 'não informado'}
+Cardápio: ${cfg.cardapioLink || 'não informado'}
+Horário: ${cfg.horario || 'não informado'}
+Endereço: ${cfg.endereco || 'não informado'}
+Telefone: ${cfg.whatsapp || 'não informado'}
 `;
 
 // --- FUNÇÃO: gravar status/qr no Firebase (path: sessions/{sessionId}/session) ---
@@ -313,7 +314,7 @@ const attachLifecycleListeners = (sessionId, client, initializationPromise) => {
       // Inicializa o modelo da IA para a sessão, se ainda não existir
       if (!sessionModels[sessionId]) {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash"; // CORREÇÃO: Usando modelo válido
+        const modelName = process.env.GEMINI_MODEL_NAME || "gemini-1.5-flash"; // CORREÇÃO: Usando modelo válido
         const systemInstruction = createSystemInstruction(config);
 
         sessionModels[sessionId] = genAI.getGenerativeModel({

@@ -2,15 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './src/hooks/useAuth';
 import { toast } from 'sonner';
 import { Save, Loader, AlertTriangle, QrCode, Wifi, WifiOff, LogOut, ChevronDown } from 'lucide-react';
-import { getDatabase, ref, get, set } from 'firebase/database';
+import { getDatabase, ref, get, set, onValue } from 'firebase/database';
 
 interface WhatsAppConfig {
   isActive: boolean;
-  restaurantName: string;
-  phoneNumber: string;
-  menuUrl: string;
-  hours: string;
-  address: string;
+  nome: string;
+  whatsapp: string;
+  cardapioLink: string;
+  horario: string;
+  endereco: string;
+  mensagemBoasVindas: string;
 }
 
 type ConnectionStatus = 
@@ -33,11 +34,12 @@ const WhatsAppAttendanceSection: React.FC = () => {
   
   const [config, setConfig] = useState<WhatsAppConfig>({
     isActive: true,
-    restaurantName: '',
-    phoneNumber: '',
-    menuUrl: '',
-    hours: '',
-    address: '',
+    nome: '',
+    whatsapp: '',
+    cardapioLink: '',
+    horario: '',
+    endereco: '',
+    mensagemBoasVindas: 'Olá! Sou seu assistente virtual. Como posso ajudar?',
   });
   
   const [isLoading, setIsLoading] = useState(true);
@@ -373,28 +375,34 @@ const WhatsAppAttendanceSection: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="restaurantName" className="block text-sm font-medium text-gray-700 mb-1">Nome do Restaurante</label>
-                <input type="text" name="restaurantName" id="restaurantName" value={config.restaurantName} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: Pizzaria do Jataí" />
+                <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">Nome do Restaurante</label>
+                <input type="text" name="nome" id="nome" value={config.nome} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: Pizzaria do Jataí" />
               </div>
               <div>
-                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">Telefone de Contato</label>
-                <input type="text" name="phoneNumber" id="phoneNumber" value={config.phoneNumber} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: (11) 99999-9999" />
+                <label htmlFor="whatsapp" className="block text-sm font-medium text-gray-700 mb-1">Telefone de Contato</label>
+                <input type="text" name="whatsapp" id="whatsapp" value={config.whatsapp} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: (11) 99999-9999" />
               </div>
             </div>
 
             <div>
-              <label htmlFor="menuUrl" className="block text-sm font-medium text-gray-700 mb-1">Link do Cardápio</label>
-              <input type="url" name="menuUrl" id="menuUrl" value={config.menuUrl} onChange={handleInputChange} placeholder="https://seu-cardapio.com" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+              <label htmlFor="cardapioLink" className="block text-sm font-medium text-gray-700 mb-1">Link do Cardápio</label>
+              <input type="url" name="cardapioLink" id="cardapioLink" value={config.cardapioLink} onChange={handleInputChange} placeholder="https://seu-cardapio.com" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
             </div>
 
             <div>
-              <label htmlFor="hours" className="block text-sm font-medium text-gray-700 mb-1">Horário de Funcionamento</label>
-              <input type="text" name="hours" id="hours" value={config.hours} onChange={handleInputChange} placeholder="Ex: Terça a Domingo, das 18h às 23h" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+              <label htmlFor="horario" className="block text-sm font-medium text-gray-700 mb-1">Horário de Funcionamento</label>
+              <input type="text" name="horario" id="horario" value={config.horario} onChange={handleInputChange} placeholder="Ex: Terça a Domingo, das 18h às 23h" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
             </div>
 
             <div>
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
-              <input type="text" name="address" id="address" value={config.address} onChange={handleInputChange} placeholder="Rua, Número, Bairro, Cidade-UF" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+              <label htmlFor="endereco" className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
+              <input type="text" name="endereco" id="endereco" value={config.endereco} onChange={handleInputChange} placeholder="Rua, Número, Bairro, Cidade-UF" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+            </div>
+
+            <div>
+              <label htmlFor="mensagemBoasVindas" className="block text-sm font-medium text-gray-700 mb-1">Mensagem de Boas-vindas</label>
+              <textarea name="mensagemBoasVindas" id="mensagemBoasVindas" rows={3} value={config.mensagemBoasVindas} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+              <p className="mt-2 text-xs text-gray-500">Esta é a primeira mensagem que o assistente enviará ao cliente.</p>
             </div>
 
             <div className="flex justify-end">
